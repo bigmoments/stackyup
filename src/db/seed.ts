@@ -1,10 +1,15 @@
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config();
+
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db, schema } from "./index";
 import { runMigrations } from "./migrate";
 import { generateApiKey } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 export async function seed() {
   console.log("Ensuring database migrations are up to date...");
@@ -51,16 +56,23 @@ export async function seed() {
   }
 
   // 2. Check or create default Admin user
+  const adminPassword = process.env.ADMIN_PASSWORD || "stackyup2026!";
+  const passwordHash = bcrypt.hashSync(adminPassword, 10);
   const existingAdmins = await db.select().from(schema.admins).limit(1);
+
   if (existingAdmins.length === 0) {
     const adminId = `adm_${nanoid(16)}`;
     await db.insert(schema.admins).values({
       id: adminId,
       email: "admin@stackyup.com",
-      passwordHash: "$2b$10$abcdefghijklmnopqrstuvwxyz1234567890", // placeholder hash
+      passwordHash: passwordHash,
       role: "admin",
     });
-    console.log("Created default admin record (admin@stackyup.com)");
+    console.log(`Created default admin record (admin@stackyup.com / ${adminPassword})`);
+  } else {
+    // Ensure admin has valid bcrypt password
+    await db.update(schema.admins).set({ passwordHash }).where(eq(schema.admins.id, existingAdmins[0].id));
+    console.log(`Updated admin password for ${existingAdmins[0].email}`);
   }
 
   console.log("Database seeding completed.");

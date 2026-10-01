@@ -48,7 +48,7 @@ export async function uploadFile(
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: "stackyup/media",
+          folder: process.env.CLOUDINARY_FOLDER || "stackyup",
           public_id: id,
           resource_type: "image",
           format: "webp", // auto-convert to WebP

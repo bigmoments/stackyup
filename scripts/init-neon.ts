@@ -1,13 +1,26 @@
-import path from "path";
+import pg from "pg";
 import dotenv from "dotenv";
+import path from "path";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import { nanoid } from "nanoid";
+
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
-dotenv.config();
 
-import { sql } from "drizzle-orm";
-import { db } from "./index";
+async function initNeon() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error("DATABASE_URL is not set.");
+    process.exit(1);
+  }
 
-export async function runMigrations() {
-  console.log("Running database migrations...");
+  console.log("Connecting directly to Neon database...");
+  const client = new pg.Client({
+    connectionString: url,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  await client.connect();
 
   const ddlStatements = [
     `CREATE TABLE IF NOT EXISTS api_keys (
@@ -90,19 +103,47 @@ export async function runMigrations() {
     );`
   ];
 
-  for (const statement of ddlStatements) {
-    await db.execute(sql.raw(statement));
+  for (const stmt of ddlStatements) {
+    await client.query(stmt);
+  }
+  console.log("All tables created successfully on Neon.");
+
+  // Insert default API Key
+  const rawKey = process.env.CMS_API_KEY || "sy_live_0c3f4dc22e7fd9b8ee43d8a0681ad7f179aace26b7bedd54";
+  const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+  const keyPrefix = rawKey.slice(0, 8);
+
+  const existingKeys = await client.query("SELECT id FROM api_keys WHERE key_hash = $1", [keyHash]);
+  if (existingKeys.rows.length === 0) {
+    await client.query(
+      `INSERT INTO api_keys (id, name, key_hash, key_prefix, is_active) VALUES ($1, $2, $3, $4, $5)`,
+      [`k_${nanoid(16)}`, "Default Muse Production Key", keyHash, keyPrefix, true]
+    );
+    console.log("Inserted active Muse API Key into Neon.");
   }
 
-  console.log("Migrations applied successfully.");
+  // Insert default admin
+  const adminPassword = process.env.ADMIN_PASSWORD || "stackyup2026!";
+  const passwordHash = bcrypt.hashSync(adminPassword, 10);
+  const existingAdmins = await client.query("SELECT id FROM admins WHERE email = $1", ["admin@stackyup.com"]);
+  if (existingAdmins.rows.length === 0) {
+    await client.query(
+      `INSERT INTO admins (id, email, password_hash, role) VALUES ($1, $2, $3, $4)`,
+      [`adm_${nanoid(16)}`, "admin@stackyup.com", passwordHash, "admin"]
+    );
+    console.log("Inserted default admin into Neon (admin@stackyup.com)");
+  }
+
+  // Verify tables
+  const res = await client.query(
+    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+  );
+  console.log("Verified tables in Neon:", res.rows.map((r) => r.table_name));
+
+  await client.end();
 }
 
-// Allow direct execution via tsx
-if (process.argv[1]?.includes("migrate")) {
-  runMigrations()
-    .then(() => process.exit(0))
-    .catch((err) => {
-      console.error("Migration failed:", err);
-      process.exit(1);
-    });
-}
+initNeon().catch((err) => {
+  console.error("Init Neon failed:", err);
+  process.exit(1);
+});
