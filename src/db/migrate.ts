@@ -100,7 +100,8 @@ export async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);`,
 
     `ALTER TABLE posts ADD COLUMN IF NOT EXISTS claps INTEGER DEFAULT 0 NOT NULL;`,
-    `ALTER TABLE posts ADD COLUMN IF NOT EXISTS author_name VARCHAR(100) DEFAULT 'Adit' NOT NULL;`,
+    `ALTER TABLE posts ADD COLUMN IF NOT EXISTS author_name VARCHAR(100);`,
+    `ALTER TABLE posts ALTER COLUMN author_name DROP NOT NULL;`,
     `ALTER TABLE comments ADD COLUMN IF NOT EXISTS post_title VARCHAR(255);`,
     `ALTER TABLE comments ADD COLUMN IF NOT EXISTS author_email VARCHAR(255);`,
     `ALTER TABLE comments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'approved' NOT NULL;`,
