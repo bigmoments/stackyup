@@ -1,6 +1,7 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { eq, or } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { verifyApiKey } from "@/lib/auth";
 import { errorResponse, successResponse } from "@/lib/response";
 import { cleanHtml } from "@/lib/sanitizer";
@@ -19,7 +20,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-// GET /api/v1/pages/:id
+// GET /api/v1/pages/:id_or_slug
 export async function GET(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-// PATCH /api/v1/pages/:id
+// PATCH /api/v1/pages/:id_or_slug
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
@@ -79,10 +80,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const decodedId = decodeURIComponent(id);
 
-  let body: unknown;
+  let body: any;
   try {
     body = await request.json();
+    if (body && typeof body === "object") {
+      if (body.content_html === undefined && typeof body.html === "string") {
+        body.content_html = body.html;
+      }
+    }
   } catch {
     return errorResponse("VALIDATION_ERROR", "Invalid JSON payload in request body", null, 400);
   }
@@ -98,11 +105,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const existing = await db
       .select()
       .from(schema.pages)
-      .where(or(eq(schema.pages.id, id), eq(schema.pages.slug, id)))
+      .where(or(eq(schema.pages.id, decodedId), eq(schema.pages.slug, decodedId)))
       .limit(1);
 
     if (existing.length === 0) {
-      return errorResponse("NOT_FOUND", `Page '${id}' not found`, null, 404);
+      return errorResponse("NOT_FOUND", `Page '${decodedId}' not found`, null, 404);
     }
 
     const current = existing[0];
@@ -120,7 +127,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (data.content_html !== undefined) {
-      updateValues.contentHtml = cleanHtml(data.content_html);
+      const clean = cleanHtml(data.content_html);
+      updateValues.contentHtml = clean;
+
+      // Add revision record
+      await db.insert(schema.revisions).values({
+        id: `rev_${nanoid(16)}`,
+        pageId: current.id,
+        title: data.title || current.title,
+        contentHtml: clean,
+      });
     }
 
     await db.update(schema.pages).set(updateValues).where(eq(schema.pages.id, current.id));
@@ -148,7 +164,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 }
 
-// DELETE /api/v1/pages/:id
+// DELETE /api/v1/pages/:id_or_slug
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
@@ -161,24 +177,31 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const decodedId = decodeURIComponent(id);
 
   try {
     const existing = await db
-      .select()
+      .select({ id: schema.pages.id, slug: schema.pages.slug })
       .from(schema.pages)
-      .where(or(eq(schema.pages.id, id), eq(schema.pages.slug, id)))
+      .where(or(eq(schema.pages.id, decodedId), eq(schema.pages.slug, decodedId)))
       .limit(1);
 
     if (existing.length === 0) {
-      return errorResponse("NOT_FOUND", `Page '${id}' not found`, null, 404);
+      return errorResponse("NOT_FOUND", `Page '${decodedId}' not found`, null, 404);
     }
 
-    await db.delete(schema.pages).where(eq(schema.pages.id, existing[0].id));
+    const pageToDelete = existing[0];
 
-    return successResponse({ message: "Page deleted successfully", id: existing[0].id });
+    // Delete associated revisions
+    await db.delete(schema.revisions).where(eq(schema.revisions.pageId, pageToDelete.id));
+
+    // Hard delete page
+    await db.delete(schema.pages).where(eq(schema.pages.id, pageToDelete.id));
+
+    // Return 204 No Content
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("Error deleting page:", error);
     return errorResponse("INTERNAL_SERVER_ERROR", "Failed to delete page", null, 500);
   }
 }
-

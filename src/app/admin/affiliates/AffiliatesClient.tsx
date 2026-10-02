@@ -16,6 +16,7 @@ import {
   MousePointerClick,
 } from "lucide-react";
 import { AffiliatePartner } from "@/app/api/admin/affiliates/route";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface AffiliatesClientProps {
   initialAffiliates: AffiliatePartner[];
@@ -23,6 +24,7 @@ interface AffiliatesClientProps {
 
 export default function AffiliatesClient({ initialAffiliates }: AffiliatesClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [affiliates, setAffiliates] = useState<AffiliatePartner[]>(initialAffiliates);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -121,7 +123,12 @@ export default function AffiliatesClient({ initialAffiliates }: AffiliatesClient
   }
 
   async function handleDelete(item: AffiliatePartner) {
-    if (!confirm(`Delete affiliate link for "${item.brand}"?`)) return;
+    const ok = await dialog.dangerConfirm(
+      `Hapus Tautan Afiliasi "${item.brand}"?`,
+      "Tautan mitra afiliasi ini akan dihapus dari sistem. Pengalihan tautan aktif mungkin tidak lagi berfungsi.",
+      "Ya, Hapus Tautan"
+    );
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/affiliates?id=${item.id}`, { method: "DELETE" });
@@ -130,9 +137,12 @@ export default function AffiliatesClient({ initialAffiliates }: AffiliatesClient
         setSuccess(`Removed partner "${item.brand}".`);
         setTimeout(() => setSuccess(null), 3000);
         router.refresh();
+      } else {
+        const data = await res.json();
+        dialog.error("Gagal Menghapus", data.error?.message || "Terjadi kesalahan saat menghapus mitra.");
       }
-    } catch (err) {
-      console.error("Delete partner link error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 

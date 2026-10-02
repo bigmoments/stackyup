@@ -34,6 +34,8 @@ import { extractAndInjectToc } from "@/lib/toc";
 import { injectInArticleAds } from "@/lib/ads";
 import { getOrSetCache } from "@/lib/cache";
 import { expandShortcodes, hasAffiliateShortcodes } from "@/lib/shortcodes";
+import { getDbAdPlacements } from "@/lib/ads-db";
+import { getOptimizedImageUrl } from "@/lib/storage";
 
 // 100% Free Tier Optimization: Pure On-Demand SSG.
 // Revalidates ONLY on CMS publish/update/delete events via revalidatePath
@@ -72,6 +74,20 @@ async function getPostBySlug(decodedSlug: string) {
   );
 }
 
+function toSafeIsoString(date: unknown): string {
+  if (!date) return new Date().toISOString();
+  if (date instanceof Date) return date.toISOString();
+  const parsed = new Date(String(date));
+  return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function toOptionalIsoString(date: unknown): string | undefined {
+  if (!date) return undefined;
+  if (date instanceof Date) return date.toISOString();
+  const parsed = new Date(String(date));
+  return isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
 // 1. Dynamic SEO & AIEO Metadata Generator
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -104,8 +120,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       url: canonicalUrl,
       siteName: "StackYup",
       type: "article",
-      publishedTime: post.publishedAt?.toISOString(),
-      modifiedTime: post.updatedAt?.toISOString(),
+      publishedTime: toOptionalIsoString(post.publishedAt),
+      modifiedTime: toSafeIsoString(post.updatedAt || post.createdAt),
       authors: [authorName],
       section: primaryTag,
       tags: (post.tags as string[]) || [],
@@ -127,8 +143,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       creator: "@stackyup",
     },
     other: {
-      "article:published_time": post.publishedAt?.toISOString() || post.createdAt.toISOString(),
-      "article:modified_time": post.updatedAt?.toISOString() || post.createdAt.toISOString(),
+      "article:published_time": toSafeIsoString(post.publishedAt || post.createdAt),
+      "article:modified_time": toSafeIsoString(post.updatedAt || post.createdAt),
       "article:author": authorName,
       "article:section": primaryTag,
     },
@@ -174,8 +190,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   // 4. Auto-ToC parsing and anchor injection
   const { headings, enhancedHtml } = extractAndInjectToc(postHtmlWithShortcodes);
 
-  // 5. In-article automated ad placement
-  const contentWithAds = injectInArticleAds(enhancedHtml);
+  // 5. In-article automated ad placement (dynamically fetched from DB)
+  const adPlacements = await getDbAdPlacements();
+  const contentWithAds = injectInArticleAds(enhancedHtml, adPlacements["in_article"]);
 
   const faqItems = (post.faqJson as { question: string; answer: string }[]) || [];
   const tagsList = (post.tags as string[]) || [];
@@ -220,8 +237,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     description: post.metaDescription || post.excerpt,
     inLanguage: "en-US",
     image: post.featuredImageUrl ? [post.featuredImageUrl] : [],
-    datePublished: post.publishedAt?.toISOString() || post.createdAt.toISOString(),
-    dateModified: post.updatedAt?.toISOString() || post.createdAt.toISOString(),
+    datePublished: toSafeIsoString(post.publishedAt || post.createdAt),
+    dateModified: toSafeIsoString(post.updatedAt || post.createdAt),
     wordCount,
     timeRequired: `PT${readingTime}M`,
     keywords: tagsList.join(", "),
@@ -320,6 +337,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       )}
 
       <PublicNavbar />
+
+      {/* 1. Header Ad Slot Position */}
+      {adPlacements["header"]?.isEnabled && !adPlacements["header"]?.excludeSlugs?.includes(post.slug) && (
+        <div className="w-full max-w-[1420px] mx-auto px-4 sm:px-6 pt-4">
+          <AdSlot
+            variant="header"
+            slotId="ad-position-header"
+            placement={adPlacements["header"]}
+          />
+        </div>
+      )}
 
       {/* Main Container: 3-Column Architectural Layout on Wide Desktop (Section 1: 270px | 700px | 310px, gap 36px) */}
       <main className="flex-1 w-full max-w-[1420px] mx-auto px-4 sm:px-6 pt-6 pb-20">
@@ -426,7 +454,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                     <span className="text-[#8a9099]">•</span>
                     <span className="flex items-center gap-1">
                       <Eye className="w-3.5 h-3.5 text-[#8a9099]" />
-                      <span>55</span>
+                      <span>{post.views || 0}</span>
                     </span>
                   </div>
 
@@ -446,12 +474,23 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               </div>
             </header>
 
+            {/* 2. Below Title Ad Slot Position */}
+            {adPlacements["below_title"]?.isEnabled && !adPlacements["below_title"]?.excludeSlugs?.includes(post.slug) && (
+              <div className="mb-6 w-full">
+                <AdSlot
+                  variant="below_title"
+                  slotId="ad-position-below-title"
+                  placement={adPlacements["below_title"]}
+                />
+              </div>
+            )}
+
             {/* Hero Image (Section 14: 16:9, radius 10px, caption mt 8px, gap to takeaways 24px) */}
             {post.featuredImageUrl && (
               <figure className="mb-[24px]">
                 <div className="overflow-hidden rounded-[10px] bg-[#f8faf9] aspect-video w-full border border-[#e6ebe8]">
                   <img
-                    src={post.featuredImageUrl}
+                    src={getOptimizedImageUrl(post.featuredImageUrl)}
                     alt={post.featuredImageAlt || post.title}
                     className="w-full h-full object-cover"
                     loading="eager"
@@ -596,8 +635,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               </div>
             </div>
 
-            {/* Bottom Article Ad Slot (Google AdSense Responsive Multiplex / Display) */}
-            <AdSlot variant="bottom-article" slotId="bottom-article-display" />
+            {/* Bottom Article / After Content Ad Slot */}
+            {(!adPlacements["after_content"]?.excludeSlugs || !adPlacements["after_content"]?.excludeSlugs?.includes(post.slug)) && (
+              <AdSlot
+                variant="after_content"
+                slotId="bottom-article-display"
+                placement={adPlacements["after_content"] || adPlacements["bottom_article"]}
+              />
+            )}
 
             {/* Author Bio Box */}
             <div className="p-6 sm:p-7 rounded-2xl bg-[#f4fbf7] border border-[#e8ece9] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 my-10">
@@ -640,6 +685,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <aside className="hidden lg:block w-[300px] xl:w-[310px] sticky top-[88px] self-start shrink-0">
             <ArticleRightSidebar
               recommendedPosts={relatedPosts}
+              adPlacement={adPlacements["article_sidebar"]}
             />
           </aside>
         </div>
@@ -676,7 +722,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                     </div>
                     <span>{authorName}</span>
                     <span>•</span>
-                    <time dateTime={rel.publishedAt?.toISOString()}>
+                    <time dateTime={toOptionalIsoString(rel.publishedAt || rel.createdAt)}>
                       {new Date(rel.publishedAt || rel.createdAt).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -711,6 +757,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         title={post.title}
         articleUrl={articleUrl}
       />
+
+      {/* Footer Ad Slot Position */}
+      {adPlacements["footer"]?.isEnabled && !adPlacements["footer"]?.excludeSlugs?.includes(post.slug) && (
+        <div className="w-full max-w-[1420px] mx-auto px-4 sm:px-6 pb-6">
+          <AdSlot
+            variant="footer"
+            slotId="ad-position-footer"
+            placement={adPlacements["footer"]}
+          />
+        </div>
+      )}
 
       <PublicFooter />
     </div>

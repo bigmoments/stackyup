@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { eq, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -81,10 +81,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const decodedIdOrSlug = decodeURIComponent(id);
 
-  let body: unknown;
+  let body: any;
   try {
     body = await request.json();
+    if (body && typeof body === "object") {
+      if (body.content_html === undefined && typeof body.html === "string") {
+        body.content_html = body.html;
+      }
+    }
   } catch {
     return errorResponse("VALIDATION_ERROR", "Invalid JSON payload in request body", null, 400);
   }
@@ -101,11 +107,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const existing = await db
       .select()
       .from(schema.posts)
-      .where(or(eq(schema.posts.id, id), eq(schema.posts.slug, id)))
+      .where(or(eq(schema.posts.id, decodedIdOrSlug), eq(schema.posts.slug, decodedIdOrSlug)))
       .limit(1);
 
     if (existing.length === 0) {
-      return errorResponse("NOT_FOUND", `Post '${id}' not found`, null, 404);
+      return errorResponse("NOT_FOUND", `Post with id or slug '${decodedIdOrSlug}' not found`, null, 404);
     }
 
     const current = existing[0];
@@ -181,6 +187,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       await invalidatePostCache(current.slug);
     }
 
+    if (updated[0].status === "scheduled" && updated[0].publishedAt) {
+      const { schedulePostWithQStash } = await import("@/lib/qstash");
+      await schedulePostWithQStash(updated[0].id, updated[0].publishedAt).catch((e) =>
+        console.warn("[QStash Schedule Trigger] Note:", e)
+      );
+    }
+
     return successResponse(formatPostResponse(updated[0], publicUrl));
   } catch (error) {
     console.error("Error updating post:", error);
@@ -188,7 +201,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 }
 
-// DELETE /api/v1/posts/:id
+// DELETE /api/v1/posts/:id_or_slug
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
@@ -201,24 +214,31 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const decodedIdOrSlug = decodeURIComponent(id);
 
   try {
     const existing = await db
       .select({ id: schema.posts.id, slug: schema.posts.slug })
       .from(schema.posts)
-      .where(or(eq(schema.posts.id, id), eq(schema.posts.slug, id)))
+      .where(or(eq(schema.posts.id, decodedIdOrSlug), eq(schema.posts.slug, decodedIdOrSlug)))
       .limit(1);
 
     if (existing.length === 0) {
-      return errorResponse("NOT_FOUND", `Post '${id}' not found`, null, 404);
+      return errorResponse("NOT_FOUND", `Post with id or slug '${decodedIdOrSlug}' not found`, null, 404);
     }
 
-    await db.delete(schema.posts).where(eq(schema.posts.id, existing[0].id));
+    const postToDelete = existing[0];
 
-    // Invalidate cache
-    await invalidatePostCache(existing[0].slug);
+    // Hard delete: remove associated revisions & comments first to avoid orphan records or FK constraint issues
+    await db.delete(schema.revisions).where(eq(schema.revisions.postId, postToDelete.id));
+    await db.delete(schema.comments).where(eq(schema.comments.postId, postToDelete.id));
+    await db.delete(schema.posts).where(eq(schema.posts.id, postToDelete.id));
 
-    return successResponse({ message: `Post '${id}' deleted successfully` });
+    // Invalidate Upstash Redis & Edge cache
+    await invalidatePostCache(postToDelete.slug);
+
+    // 204 No Content
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("Error deleting post:", error);
     return errorResponse("INTERNAL_SERVER_ERROR", "Failed to delete post", null, 500);

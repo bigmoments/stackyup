@@ -50,6 +50,19 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
                 </span>
                 <a
                   href={`#${item.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const targetEl = document.getElementById(item.id);
+                    if (targetEl) {
+                      const navOffset = 88;
+                      const elementPosition = targetEl.getBoundingClientRect().top + window.scrollY;
+                      window.scrollTo({
+                        top: elementPosition - navOffset,
+                        behavior: "smooth",
+                      });
+                      window.history.pushState(null, "", `#${item.id}`);
+                    }
+                  }}
                   className="text-[#667085] hover:text-[#078a4b] transition-colors leading-snug line-clamp-1 font-medium py-1.5 flex-1"
                 >
                   {cleanText}

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Mail, Check, Star } from "lucide-react";
 import AdSlot from "./AdSlot";
 
+import { DBAdPlacement } from "@/lib/ads-shared";
+
 export interface RecommendedArticle {
   id: string;
   title: string;
@@ -18,10 +20,12 @@ export interface RecommendedArticle {
 
 interface ArticleRightSidebarProps {
   recommendedPosts?: RecommendedArticle[];
+  adPlacement?: DBAdPlacement;
 }
 
 export default function ArticleRightSidebar({
   recommendedPosts = [],
+  adPlacement,
 }: ArticleRightSidebarProps) {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
@@ -80,8 +84,12 @@ export default function ArticleRightSidebar({
 
   return (
     <div className="space-y-4 font-sans select-none">
-      {/* 1. TOP ADVERTISEMENT (Centrally managed via src/config/ads.ts or Google AdSense) */}
-      <AdSlot variant="sidebar" slotId="article-right-sidebar-top" />
+      {/* 1. TOP ADVERTISEMENT (Centrally managed via DB ad_placements with fallback) */}
+      <AdSlot
+        variant="sidebar"
+        slotId="article-right-sidebar-top"
+        placement={adPlacement}
+      />
 
       {/* 2. RECOMMENDED FOR YOU (Matching Mockup 1) */}
       <div className="bg-white rounded-2xl border border-[#eaedeb] p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-3.5">

@@ -7,8 +7,12 @@ import fs from "fs";
 import * as schema from "./schema";
 import dotenv from "dotenv";
 
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
-dotenv.config();
+// Next.js automatically loads .env and .env.local into process.env.
+// Fallback dotenv config only when running outside Next.js runtime (e.g. standalone scripts)
+if (!process.env.NEXT_RUNTIME && typeof window === "undefined") {
+  dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+  dotenv.config();
+}
 
 const { Pool } = pg;
 
@@ -24,9 +28,6 @@ declare global {
 export function getDb(): DbClient {
   if (globalThis.__cachedDb) return globalThis.__cachedDb;
 
-  dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
-  dotenv.config();
-
   const useLocal =
     process.env.USE_LOCAL_DB === "true" ||
     process.env.USE_LOCAL_DB === "1" ||
@@ -34,7 +35,12 @@ export function getDb(): DbClient {
     process.env.DATABASE_URL.trim() === "";
 
   if (!useLocal && process.env.DATABASE_URL) {
-    const dbUrl = process.env.DATABASE_URL;
+    let dbUrl = process.env.DATABASE_URL;
+    // Replace sslmode=require with sslmode=verify-full to suppress pg-connection-string v3 security warning
+    if (dbUrl.includes("sslmode=require")) {
+      dbUrl = dbUrl.replace("sslmode=require", "sslmode=verify-full");
+    }
+
     // Optimized connection pooling for Vercel Serverless & Neon
     if (!globalThis.__cachedPool) {
       globalThis.__cachedPool = new Pool({
@@ -42,7 +48,7 @@ export function getDb(): DbClient {
         max: 10, // Adequate pool for Next.js multi-worker build and serverless environment
         idleTimeoutMillis: 15000, // 15s idle drops connection cleanly
         connectionTimeoutMillis: 10000, // 10s allows Neon cold-start wake up without timing out indefinitely
-        ssl: dbUrl.includes("sslmode=require") || dbUrl.includes("neon.tech") || dbUrl.includes("supabase.co")
+        ssl: dbUrl.includes("sslmode=") || dbUrl.includes("neon.tech") || dbUrl.includes("supabase.co")
           ? { rejectUnauthorized: false }
           : undefined,
       });

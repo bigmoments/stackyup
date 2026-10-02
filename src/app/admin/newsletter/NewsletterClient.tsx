@@ -11,11 +11,11 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
-  FileText,
   Sparkles,
   Eye,
   X,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface NewsletterCampaign {
   id: string;
@@ -46,6 +46,7 @@ export default function NewsletterClient({
   recentPosts,
 }: NewsletterClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [campaigns, setCampaigns] = useState<NewsletterCampaign[]>(initialCampaigns);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingCampaign, setViewingCampaign] = useState<NewsletterCampaign | null>(null);
@@ -135,17 +136,25 @@ ${recentPosts
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Remove this campaign from dispatch history?")) return;
+  async function handleDelete(camp: NewsletterCampaign) {
+    const ok = await dialog.dangerConfirm(
+      `Hapus Riwayat Kampanye "${camp.subject}"?`,
+      "Catatan pengiriman kampanye newsletter ini akan dihapus dari histori analitik Anda.",
+      "Ya, Hapus Catatan"
+    );
+    if (!ok) return;
 
     try {
-      const res = await fetch(`/api/admin/newsletter?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/newsletter?id=${camp.id}`, { method: "DELETE" });
       if (res.ok) {
-        setCampaigns((prev) => prev.filter((c) => c.id !== id));
+        setCampaigns((prev) => prev.filter((c) => c.id !== camp.id));
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        dialog.error("Gagal Menghapus", data.error?.message || "Gagal menghapus riwayat kampanye.");
       }
-    } catch (err) {
-      console.error("Delete campaign error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -279,7 +288,7 @@ ${recentPosts
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(camp.id)}
+                          onClick={() => handleDelete(camp)}
                           className="p-1.5 rounded-lg text-[#667085] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                           title="Delete Record"
                         >

@@ -105,7 +105,13 @@ export default async function StaticPage({ params }: StaticPageProps) {
       name: "StackYup",
       url: baseUrl,
     },
-    dateModified: page.updatedAt?.toISOString() || page.createdAt.toISOString(),
+    dateModified: page.updatedAt
+      ? page.updatedAt instanceof Date
+        ? page.updatedAt.toISOString()
+        : new Date(String(page.updatedAt)).toISOString()
+      : page.createdAt instanceof Date
+      ? page.createdAt.toISOString()
+      : new Date(String(page.createdAt)).toISOString(),
   };
 
   return (

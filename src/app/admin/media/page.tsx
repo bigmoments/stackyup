@@ -11,6 +11,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface MediaItem {
   id: string;
@@ -24,6 +25,7 @@ interface MediaItem {
 }
 
 export default function AdminMediaPage() {
+  const dialog = useDialog();
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -96,7 +98,12 @@ export default function AdminMediaPage() {
   }
 
   async function handleDelete(item: MediaItem) {
-    if (!confirm(`Are you sure you want to delete image "${item.filename}"?`)) return;
+    const ok = await dialog.dangerConfirm(
+      `Hapus File Media "${item.filename}"?`,
+      "File media ini akan dihapus secara permanen dari server penyimpanan / CDN. Artikel yang memuat gambar ini mungkin rusak.",
+      "Ya, Hapus Gambar"
+    );
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/media/${item.id}`, { method: "DELETE" });
@@ -106,16 +113,24 @@ export default function AdminMediaPage() {
         setTimeout(() => setSuccess(null), 3000);
       } else {
         const data = await res.json();
-        alert(data.error?.message || "Failed to delete image");
+        dialog.error("Gagal Menghapus", data.error?.message || "Gagal menghapus file media.");
       }
-    } catch (err) {
-      console.error("Delete media error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
   function handleCopy(url: string, id: string) {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  function handleCopyShortcode(item: MediaItem) {
+    const altText = item.alt || item.filename.replace(/\.[^/.]+$/, "");
+    const shortcode = `[img id="${item.id}" alt="${altText}"]`;
+    navigator.clipboard.writeText(shortcode);
+    setCopiedId(`sc_${item.id}`);
     setTimeout(() => setCopiedId(null), 2000);
   }
 
@@ -243,9 +258,28 @@ export default function AdminMediaPage() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      onClick={() => handleCopyShortcode(item)}
+                      className="px-2 py-1.5 rounded-lg bg-[#F8FAF9] hover:bg-[#EAF8F0] text-[#667085] hover:text-[#079653] text-[11px] font-medium transition flex items-center gap-1 cursor-pointer border border-[#E6EBE8]"
+                      title="Copy Shortcode: [img id=...]"
+                    >
+                      {copiedId === `sc_${item.id}` ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-[#079653]" />
+                          <span className="text-[#079653] text-[10px] font-bold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-[#079653]" />
+                          <span className="text-[10px]">Shortcode</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleCopy(item.url, item.id)}
                       className="p-1.5 rounded-lg bg-[#F8FAF9] hover:bg-[#EAF8F0] text-[#667085] hover:text-[#079653] text-xs transition flex items-center gap-1 cursor-pointer border border-[#E6EBE8]"
-                      title="Copy Image URL"
+                      title="Copy Direct Image URL"
                     >
                       {copiedId === item.id ? (
                         <Check className="w-3.5 h-3.5 text-[#079653]" />

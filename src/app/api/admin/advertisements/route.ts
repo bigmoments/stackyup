@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db, schema } from "@/db";
 import { getCurrentAdmin } from "@/lib/admin-session";
 import { errorResponse, successResponse } from "@/lib/response";
+import { invalidateAdPlacementsCache } from "@/lib/ads-db";
 
 export async function GET() {
   try {
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
         .update(schema.adPlacements)
         .set({
           title: title || existing[0].title,
-          isEnabled: isEnabled !== undefined ? isEnabled : existing[0].isEnabled,
+          isEnabled: isEnabled !== undefined ? Boolean(isEnabled) : existing[0].isEnabled,
           provider: provider || existing[0].provider,
           adClient: adClient !== undefined ? adClient : existing[0].adClient,
           adSlot: adSlot !== undefined ? adSlot : existing[0].adSlot,
@@ -54,6 +56,18 @@ export async function POST(request: NextRequest) {
         adSlot: adSlot || null,
         customHtml: customHtml || null,
       });
+    }
+
+    // Invalidate cached placements immediately so live site updates instantly
+    await invalidateAdPlacementsCache();
+
+    // Revalidate affected routes
+    try {
+      revalidatePath("/");
+      revalidatePath("/[slug]", "page");
+      revalidatePath("/admin/advertisements");
+    } catch {
+      // outside request context or Edge safety
     }
 
     return successResponse({ message: "Ad placement updated successfully" });

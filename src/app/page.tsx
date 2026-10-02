@@ -4,6 +4,9 @@ import { db, schema } from "@/db";
 import PublicNavbar from "@/components/public/Navbar";
 import PublicFooter from "@/components/public/Footer";
 import HomepageArticleFeed from "@/components/public/HomepageArticleFeed";
+import { getDbAdPlacements } from "@/lib/ads-db";
+import { getOptimizedImageUrl } from "@/lib/storage";
+import { publishDueScheduledPosts } from "@/lib/qstash";
 
 // 100% Free Tier Optimization: Pure On-Demand SSG.
 // Revalidates ONLY on CMS publish/update/delete events via revalidatePath("/")
@@ -37,13 +40,25 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  // Pre-render published posts into static HTML during build
-  const posts = await db
-    .select()
-    .from(schema.posts)
-    .where(eq(schema.posts.status, "published"))
-    .orderBy(desc(schema.posts.publishedAt))
-    .limit(50);
+  // Passive check: Ensure any overdue scheduled posts are published immediately on visitor arrival
+  await publishDueScheduledPosts().catch((e) =>
+    console.warn("[Passive Publisher] Background check note:", e)
+  );
+
+  const [rawPosts, adPlacements] = await Promise.all([
+    db
+      .select()
+      .from(schema.posts)
+      .where(eq(schema.posts.status, "published"))
+      .orderBy(desc(schema.posts.publishedAt))
+      .limit(50),
+    getDbAdPlacements(),
+  ]);
+
+  const posts = rawPosts.map((p) => ({
+    ...p,
+    featuredImageUrl: p.featuredImageUrl ? getOptimizedImageUrl(p.featuredImageUrl) : null,
+  }));
 
   const websiteSchema = {
     "@context": "https://schema.org",
@@ -106,7 +121,7 @@ export default async function HomePage() {
 
       {/* Main Container with Client-Side Instant Filtering */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 w-full pt-6 pb-20">
-        <HomepageArticleFeed initialPosts={posts} />
+        <HomepageArticleFeed initialPosts={posts} adPlacements={adPlacements} />
       </main>
 
       <PublicFooter />

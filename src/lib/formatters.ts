@@ -1,3 +1,5 @@
+import { getOptimizedImageUrl } from "./storage";
+
 /**
  * Response serializers to ensure snake_case field consistency across all API v1 endpoints
  */
@@ -30,6 +32,7 @@ export function formatPostResponse(
   const publishedAt = post.publishedAt ?? post.published_at;
   const createdAt = post.createdAt ?? post.created_at;
   const updatedAt = post.updatedAt ?? post.updated_at;
+  const rawFeaturedImg = post.featuredImageUrl ?? post.featured_image_url ?? null;
 
   const result: FormattedPost = {
     id: post.id,
@@ -38,7 +41,7 @@ export function formatPostResponse(
     content_html: post.contentHtml ?? post.content_html ?? "",
     excerpt: post.excerpt ?? null,
     meta_description: post.metaDescription ?? post.meta_description ?? null,
-    featured_image_url: post.featuredImageUrl ?? post.featured_image_url ?? null,
+    featured_image_url: rawFeaturedImg ? getOptimizedImageUrl(rawFeaturedImg) : null,
     featured_image_alt: post.featuredImageAlt ?? post.featured_image_alt ?? null,
     tags: Array.isArray(post.tags) ? post.tags : [],
     faq: Array.isArray(post.faqJson)
@@ -79,7 +82,7 @@ export function formatMediaResponse(media: any) {
   return {
     id: media.id,
     filename: media.filename,
-    url: media.url,
+    url: getOptimizedImageUrl(media.url),
     alt: media.alt ?? null,
     width: media.width ?? null,
     height: media.height ?? null,
@@ -92,3 +95,60 @@ export function formatMediaResponse(media: any) {
       : new Date().toISOString(),
   };
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function formatAffiliateResponse(item: any) {
+  const createdAt = item.createdAt ?? item.created_at;
+  const updatedAt = item.updatedAt ?? item.updated_at;
+  return {
+    id: item.id,
+    brand: item.brand,
+    url: item.url,
+    category: item.category ?? null,
+    default_anchor_text: item.defaultAnchorText ?? item.default_anchor_text ?? item.brand,
+    status: item.status ?? "active",
+    disclosure_text: item.disclosureText ?? item.disclosure_text ?? null,
+    notes: item.notes ?? null,
+    created_at: createdAt
+      ? createdAt instanceof Date
+        ? createdAt.toISOString()
+        : String(createdAt)
+      : new Date().toISOString(),
+    updated_at: updatedAt
+      ? updatedAt instanceof Date
+        ? updatedAt.toISOString()
+        : String(updatedAt)
+      : new Date().toISOString(),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function formatAdSlotResponse(item: any) {
+  const createdAt = item.createdAt ?? item.created_at;
+  const updatedAt = item.updatedAt ?? item.updated_at;
+  return {
+    id: item.id,
+    name: item.name,
+    position: item.position,
+    network: item.network ?? "adsense",
+    ad_client: item.adClient ?? item.ad_client ?? null,
+    ad_slot: item.adSlot ?? item.ad_slot ?? null,
+    format: item.format ?? "auto",
+    responsive: Boolean(item.responsive ?? true),
+    status: item.status ?? "active",
+    show_on: item.showOn ?? item.show_on ?? "all",
+    exclude_slugs: Array.isArray(item.excludeSlugs ?? item.exclude_slugs) ? (item.excludeSlugs ?? item.exclude_slugs) : [],
+    custom_code: item.customCode ?? item.custom_code ?? null,
+    created_at: createdAt
+      ? createdAt instanceof Date
+        ? createdAt.toISOString()
+        : String(createdAt)
+      : new Date().toISOString(),
+    updated_at: updatedAt
+      ? updatedAt instanceof Date
+        ? updatedAt.toISOString()
+        : String(updatedAt)
+      : new Date().toISOString(),
+  };
+}
+

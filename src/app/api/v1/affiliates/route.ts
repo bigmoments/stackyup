@@ -1,66 +1,25 @@
-import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { desc, eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { verifyApiKey } from "@/lib/auth";
 import { errorResponse, successResponse } from "@/lib/response";
+import { checkIdempotency, saveIdempotency } from "@/lib/idempotency";
+import { formatAffiliateResponse } from "@/lib/formatters";
 import { db, schema } from "@/db";
 
-export interface PublicAffiliate {
-  id: string;
-  brand: string;
-  category: string;
-  default_anchor_text: string;
-  status: string;
-}
+const AffiliateCreateSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  brand: z.string().min(1, "Brand is required").max(100),
+  url: z.string().url("Valid destination/affiliate URL is required"),
+  category: z.string().max(100).optional().nullable(),
+  default_anchor_text: z.string().max(150).optional().nullable(),
+  status: z.enum(["active", "inactive", "paused"]).default("active").optional(),
+  disclosure_text: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
 
-const defaultPartners = [
-  {
-    id: "runpod",
-    brand: "RunPod",
-    category: "Cloud GPU / AI Infrastructure",
-    destination: "https://runpod.io",
-    affiliateUrl: "https://runpod.io?ref=stackyup",
-    default_anchor_text: "RunPod",
-    status: "Active",
-  },
-  {
-    id: "claude",
-    brand: "Claude Pro / Anthropic",
-    category: "AI LLM",
-    destination: "https://anthropic.com/claude",
-    affiliateUrl: "https://anthropic.com/?via=stackyup",
-    default_anchor_text: "Claude Pro",
-    status: "Active",
-  },
-  {
-    id: "notion",
-    brand: "Notion AI",
-    category: "Productivity",
-    destination: "https://notion.so/product/ai",
-    affiliateUrl: "https://affiliate.notion.so/stackyup-ai",
-    default_anchor_text: "Notion AI",
-    status: "Active",
-  },
-  {
-    id: "cursor",
-    brand: "Cursor IDE",
-    category: "Developer Tool",
-    destination: "https://cursor.com",
-    affiliateUrl: "https://cursor.com/ref=stackyup",
-    default_anchor_text: "Cursor IDE",
-    status: "Active",
-  },
-  {
-    id: "perplexity",
-    brand: "Perplexity Pro",
-    category: "Search AI",
-    destination: "https://perplexity.ai/pro",
-    affiliateUrl: "https://perplexity.ai/referral/stackyup",
-    default_anchor_text: "Perplexity Pro",
-    status: "Active",
-  },
-];
-
-// GET /api/v1/affiliates - List active affiliate partners for AI agents
+// GET /api/v1/affiliates - List all affiliates
 export async function GET(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
@@ -73,49 +32,96 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const record = await db
+    const list = await db
       .select()
-      .from(schema.siteSettings)
-      .where(eq(schema.siteSettings.key, "affiliate_links"))
-      .limit(1);
-
-    let partners = defaultPartners;
-    if (record.length > 0 && record[0].value) {
-      try {
-        const parsed = JSON.parse(record[0].value);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          partners = parsed.map((item: any) => ({
-            id: item.id.replace(/^aff_/, ""),
-            brand: item.brand,
-            category: item.category || "AI Tools",
-            destination: item.destination || "",
-            affiliateUrl: item.affiliateUrl || "",
-            default_anchor_text: item.brand,
-            status: item.status || "Active",
-          }));
-        }
-      } catch (e) {
-        console.error("Error parsing affiliate settings:", e);
-      }
-    }
-
-    // Filter only active affiliates and expose necessary fields
-    const activePartners: PublicAffiliate[] = partners
-      .filter((p: any) => p.status === "Active" || p.status === "active")
-      .map((p: any) => ({
-        id: p.id,
-        brand: p.brand,
-        category: p.category,
-        default_anchor_text: p.default_anchor_text || p.brand,
-        status: "Active",
-      }));
+      .from(schema.affiliates)
+      .orderBy(desc(schema.affiliates.createdAt));
 
     return successResponse({
-      items: activePartners,
-      total: activePartners.length,
+      affiliates: list.map(formatAffiliateResponse),
+      count: list.length,
     });
-  } catch (error) {
-    console.error("Error in GET /api/v1/affiliates:", error);
+  } catch (error: any) {
+    console.error("Error listing affiliates:", error);
     return errorResponse("INTERNAL_SERVER_ERROR", "Failed to retrieve affiliates", null, 500);
+  }
+}
+
+// POST /api/v1/affiliates - Create new affiliate partner (Supports Idempotency-Key)
+export async function POST(request: NextRequest) {
+  const auth = await verifyApiKey(request);
+  if (!auth.authenticated) {
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
+  }
+
+  const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
+  const cached = await checkIdempotency(idempotencyKey);
+  if (cached.isCached) {
+    return NextResponse.json(cached.body, { status: cached.status || 200 });
+  }
+
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse("VALIDATION_ERROR", "Invalid JSON payload in request body", null, 400);
+  }
+
+  const parsed = AffiliateCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("VALIDATION_ERROR", "Validation failed", parsed.error.flatten().fieldErrors, 422);
+  }
+
+  const data = parsed.data;
+  const affiliateId =
+    data.id?.trim() ||
+    `aff_${data.brand.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}_${nanoid(6)}`;
+
+  try {
+    // Check if ID already exists
+    const existing = await db
+      .select({ id: schema.affiliates.id })
+      .from(schema.affiliates)
+      .where(eq(schema.affiliates.id, affiliateId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return errorResponse("CONFLICT", `Affiliate partner with id '${affiliateId}' already exists`, null, 409);
+    }
+
+    const newRecord = {
+      id: affiliateId,
+      brand: data.brand.trim(),
+      url: data.url.trim(),
+      category: data.category?.trim() || null,
+      defaultAnchorText: data.default_anchor_text?.trim() || data.brand.trim(),
+      status: data.status || "active",
+      disclosureText: data.disclosure_text?.trim() || null,
+      notes: data.notes?.trim() || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await db.insert(schema.affiliates).values(newRecord);
+
+    const formatted = formatAffiliateResponse(newRecord);
+    const responsePayload = {
+      success: true,
+      data: formatted,
+    };
+
+    if (idempotencyKey) {
+      await saveIdempotency(idempotencyKey, 201, responsePayload);
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 });
+  } catch (error: any) {
+    console.error("Error creating affiliate:", error);
+    return errorResponse("INTERNAL_SERVER_ERROR", "Failed to create affiliate partner", null, 500);
   }
 }

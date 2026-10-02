@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tag as TagIcon, Plus, Trash2, AlertCircle } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface TagItem {
   id: string;
@@ -13,6 +14,7 @@ interface TagItem {
 
 export default function TagsClient({ initialTags }: { initialTags: TagItem[] }) {
   const router = useRouter();
+  const dialog = useDialog();
   const [tags, setTags] = useState<TagItem[]>(initialTags);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,16 +51,25 @@ export default function TagsClient({ initialTags }: { initialTags: TagItem[] }) 
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this tag?")) return;
+  async function handleDelete(id: string, tagName: string) {
+    const ok = await dialog.dangerConfirm(
+      `Hapus Tag #${tagName}?`,
+      "Tag ini akan dihapus secara permanen dari sistem dan dilepaskan dari artikel.",
+      "Ya, Hapus Tag"
+    );
+    if (!ok) return;
+
     try {
       const res = await fetch(`/api/admin/tags?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         setTags((prev) => prev.filter((t) => t.id !== id));
         router.refresh();
+      } else {
+        const data = await res.json();
+        dialog.error("Gagal Menghapus", data.error?.message || "Terjadi kesalahan saat menghapus tag.");
       }
-    } catch (err) {
-      console.error("Delete tag failed:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -142,7 +153,7 @@ export default function TagsClient({ initialTags }: { initialTags: TagItem[] }) 
                     <td className="py-3 px-5 text-right">
                       <button
                         type="button"
-                        onClick={() => handleDelete(tag.id)}
+                        onClick={() => handleDelete(tag.id, tag.name)}
                         className="p-1.5 rounded-lg text-[#8a9099] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                         title="Delete Tag"
                       >

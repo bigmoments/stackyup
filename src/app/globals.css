@@ -54,9 +54,12 @@
 }
 
 .medium-prose p,
-.article-prose p {
-  margin-bottom: 1.5em;
-  color: #596579;
+.article-prose p,
+.medium-prose li,
+.article-prose li {
+  margin-bottom: 1.4em;
+  color: #2b3545;
+  line-height: 1.75;
 }
 
 .medium-prose h1,
@@ -159,6 +162,14 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 88px;
+}
+
+.medium-prose h2,
+.article-prose h2,
+.medium-prose h3,
+.article-prose h3 {
+  scroll-margin-top: 88px;
 }
 
 .medium-prose figure {

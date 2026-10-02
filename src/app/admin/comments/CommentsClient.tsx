@@ -21,6 +21,7 @@ import {
   Archive,
 } from "lucide-react";
 import Link from "next/link";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface CommentItem {
   id: string;
@@ -40,6 +41,7 @@ interface CommentsClientProps {
 
 export default function CommentsClient({ initialComments }: CommentsClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [comments, setComments] = useState<CommentItem[]>(initialComments);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,18 +101,23 @@ export default function CommentsClient({ initialComments }: CommentsClientProps)
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to permanently delete this comment? This cannot be undone.")) return;
+    const ok = await dialog.dangerConfirm(
+      "Apakah Anda yakin ingin menghapus permanen komentar ini? Tindakan ini tidak dapat dibatalkan.",
+      "Hapus Komentar"
+    );
+    if (!ok) return;
+
     setIsProcessing(id);
     try {
       const res = await fetch(`/api/admin/comments/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete comment");
+      if (!res.ok) throw new Error("Gagal menghapus komentar");
 
       setComments((prev) => prev.filter((c) => c.id !== id));
       setSelectedIds((prev) => prev.filter((i) => i !== id));
-      notify("success", "Comment permanently deleted");
+      dialog.success("Komentar berhasil dihapus permanen.", "Terhapus");
       router.refresh();
     } catch (err: any) {
-      notify("error", err?.message || "Failed to delete comment");
+      dialog.error(err?.message || "Gagal menghapus komentar.", "Gagal");
     } finally {
       setIsProcessing(null);
     }
@@ -130,27 +137,32 @@ export default function CommentsClient({ initialComments }: CommentsClientProps)
       setComments((prev) =>
         prev.map((c) => (selectedIds.includes(c.id) ? { ...c, status: newStatus } : c))
       );
-      notify("success", `Updated ${selectedIds.length} comments to ${newStatus}`);
+      dialog.success(`Berhasil mengubah status ${selectedIds.length} komentar ke "${newStatus}".`, "Berhasil");
       setSelectedIds([]);
       router.refresh();
     } catch (err: any) {
-      notify("error", "Failed to update selected comments");
+      dialog.error("Gagal memperbarui status komentar terpilih.", "Gagal");
     }
   }
 
   async function handleBulkDelete() {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Permanently delete ${selectedIds.length} comments?`)) return;
+    const ok = await dialog.dangerConfirm(
+      `Apakah Anda yakin ingin menghapus permanen ${selectedIds.length} komentar terpilih?`,
+      "Hapus Banyak Komentar"
+    );
+    if (!ok) return;
+
     try {
       for (const id of selectedIds) {
         await fetch(`/api/admin/comments/${id}`, { method: "DELETE" });
       }
       setComments((prev) => prev.filter((c) => !selectedIds.includes(c.id)));
-      notify("success", `Deleted ${selectedIds.length} comments`);
+      dialog.success(`Berhasil menghapus ${selectedIds.length} komentar.`, "Berhasil");
       setSelectedIds([]);
       router.refresh();
     } catch (err: any) {
-      notify("error", "Failed to delete selected comments");
+      dialog.error("Gagal menghapus komentar terpilih.", "Gagal");
     }
   }
 

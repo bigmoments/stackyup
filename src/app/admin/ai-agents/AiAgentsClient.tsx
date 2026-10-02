@@ -40,6 +40,7 @@ import {
   Download,
   FileDown,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface ApiKeyItem {
   id: string;
@@ -81,6 +82,7 @@ export default function AiAgentsClient({
   agentSpecMarkdown = "",
 }: AiAgentsClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
 
   // Navigation Tab State
   const [mainTab, setMainTab] = useState<
@@ -165,7 +167,7 @@ export default function AiAgentsClient({
       setSettingsFeedback("Agent governance settings saved successfully to database!");
       setTimeout(() => setSettingsFeedback(null), 3000);
     } catch (err: any) {
-      alert(err.message || "Failed to save settings");
+      dialog.error("Gagal Menyimpan Pengaturan", err.message || "Failed to save settings");
     } finally {
       setSavingSettings(false);
     }
@@ -214,7 +216,7 @@ export default function AiAgentsClient({
         ]);
       }
     } catch (err: any) {
-      alert(err.message || "Article generation error");
+      dialog.error("Gagal Generate Artikel", err.message || "Article generation error");
     } finally {
       setGenLoading(false);
     }
@@ -249,7 +251,7 @@ export default function AiAgentsClient({
       ]);
       setNewKeyName("");
     } catch (err: any) {
-      alert(err.message || "Failed to generate key");
+      dialog.error("Gagal Membuat Kunci", err.message || "Failed to generate key");
     } finally {
       setCreatingKey(false);
     }
@@ -267,20 +269,25 @@ export default function AiAgentsClient({
 
       setKeys(keys.map((k) => (k.id === id ? { ...k, isActive: !currentActive } : k)));
     } catch (err: any) {
-      alert(err.message || "Failed to toggle key status");
+      dialog.error("Gagal Mengubah Status", err.message || "Failed to toggle key status");
     }
   }
 
   // Delete API Key
-  async function handleDeleteKey(id: string) {
-    if (!confirm("Are you sure you want to delete and revoke this API key? Connected agents will immediately lose access.")) return;
+  async function handleDeleteKey(id: string, keyName: string = "API Key") {
+    const ok = await dialog.dangerConfirm(
+      `Cabut & Hapus Kunci "${keyName}"?`,
+      "Kunci API ini akan dicabut secara permanen. Agen yang tersambung akan langsung ditolak aksesnya.",
+      "Ya, Cabut Kunci"
+    );
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/api-keys/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete key");
       setKeys(keys.filter((k) => k.id !== id));
     } catch (err: any) {
-      alert(err.message || "Failed to delete key");
+      dialog.error("Gagal Menghapus Kunci", err.message || "Failed to delete key");
     }
   }
 
@@ -1038,7 +1045,7 @@ export default function AiAgentsClient({
                         <Power className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteKey(k.id)}
+                        onClick={() => handleDeleteKey(k.id, k.name)}
                         className="p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                         title="Delete key"
                       >

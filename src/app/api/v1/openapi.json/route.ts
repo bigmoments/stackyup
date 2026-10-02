@@ -86,6 +86,44 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/media/{id}": {
+        get: {
+          summary: "Get media asset by ID",
+          description: "Retrieves media item details by ID.",
+          operationId: "getMedia",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Media unique ID ('m_...')",
+            },
+          ],
+          responses: {
+            "200": { description: "Media asset details" },
+            "404": { description: "Media not found" },
+          },
+        },
+        delete: {
+          summary: "Delete media asset",
+          description: "Permanently deletes a media asset from library and Cloudinary/storage.",
+          operationId: "deleteMedia",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Media unique ID ('m_...')",
+            },
+          ],
+          responses: {
+            "204": { description: "Media permanently deleted (No Content)" },
+            "404": { description: "Media not found" },
+          },
+        },
+      },
       "/posts": {
         post: {
           summary: "Create new article draft or post",
@@ -230,6 +268,24 @@ export async function GET(request: Request) {
             "200": { description: "Updated article" },
           },
         },
+        delete: {
+          summary: "Permanently delete post or draft",
+          description: "Hard deletes a post by ID or slug along with its revisions and comments. Invalidates cache.",
+          operationId: "deletePost",
+          parameters: [
+            {
+              name: "id_or_slug",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Article ID ('p_...') or URL slug",
+            },
+          ],
+          responses: {
+            "204": { description: "Post permanently deleted (No Content)" },
+            "404": { description: "Post not found" },
+          },
+        },
       },
       "/pages": {
         post: {
@@ -337,6 +393,24 @@ export async function GET(request: Request) {
           },
           responses: {
             "200": { description: "Updated page object" },
+          },
+        },
+        delete: {
+          summary: "Permanently delete static page",
+          description: "Hard deletes a static page by ID or slug along with revisions.",
+          operationId: "deletePage",
+          parameters: [
+            {
+              name: "id_or_slug",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Page unique ID or slug",
+            },
+          ],
+          responses: {
+            "204": { description: "Page permanently deleted (No Content)" },
+            "404": { description: "Page not found" },
           },
         },
       },

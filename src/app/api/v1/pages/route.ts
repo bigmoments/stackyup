@@ -28,9 +28,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: unknown;
+  let body: any;
   try {
     body = await request.json();
+    if (body && typeof body === "object") {
+      if (body.content_html === undefined && typeof body.html === "string") {
+        body.content_html = body.html;
+      }
+    }
   } catch {
     return errorResponse("VALIDATION_ERROR", "Invalid JSON payload in request body", null, 400);
   }
@@ -54,6 +59,14 @@ export async function POST(request: NextRequest) {
       contentHtml: sanitizedHtml,
       metaDescription: data.meta_description || null,
       status: data.status,
+    });
+
+    // Create initial revision entry
+    await db.insert(schema.revisions).values({
+      id: `rev_${nanoid(16)}`,
+      pageId: pageId,
+      title: data.title,
+      contentHtml: sanitizedHtml,
     });
 
     const host = request.headers.get("host") || "localhost:3000";

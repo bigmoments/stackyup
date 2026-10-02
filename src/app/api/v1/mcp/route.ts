@@ -83,11 +83,73 @@ export async function GET(request: Request) {
         },
       },
       {
+        name: "stackyup_list_posts",
+        description: "Retrieves list of posts with optional filtering by status (published, draft, scheduled), search keyword, and tag.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            status: { type: "string", enum: ["all", "draft", "scheduled", "published"], default: "all" },
+            q: { type: "string", description: "Search keyword in title, slug, or excerpt" },
+            tag: { type: "string", description: "Filter by topic/tag" },
+            limit: { type: "integer", default: 20 },
+            offset: { type: "integer", default: 0 },
+          },
+        },
+      },
+      {
+        name: "stackyup_update_post",
+        description: "Updates article content, title, tags, meta, or status for an existing post draft.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id_or_slug: { type: "string", description: "Article ID ('p_...') or slug to update" },
+            title: { type: "string" },
+            content_html: { type: "string" },
+            meta_description: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            featured_image_url: { type: "string" },
+            featured_image_alt: { type: "string" },
+            status: { type: "string", enum: ["draft", "scheduled", "published"] },
+          },
+          required: ["id_or_slug"],
+        },
+      },
+      {
+        name: "stackyup_get_settings",
+        description: "Retrieves public site settings including default_author_name, site_name, and public URLs.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
         name: "stackyup_list_affiliates",
         description: "Retrieves list of active affiliate partners to get their shortcode IDs and default anchor texts.",
         inputSchema: {
           type: "object",
           properties: {},
+        },
+      },
+      {
+        name: "stackyup_delete_post",
+        description: "Permanently deletes an article draft or post by ID or slug. Returns 204 No Content on success.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id_or_slug: { type: "string", description: "Article ID ('p_...') or slug" },
+          },
+          required: ["id_or_slug"],
+        },
+      },
+      {
+        name: "stackyup_delete_media",
+        description: "Permanently deletes a media image asset by ID ('m_...'). Returns 204 No Content on success.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Media ID ('m_...')" },
+          },
+          required: ["id"],
         },
       },
     ],

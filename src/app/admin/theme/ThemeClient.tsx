@@ -13,6 +13,8 @@ import {
   Layout,
 } from "lucide-react";
 
+import { useDialog } from "@/components/ui/CustomDialog";
+
 const colorPresets = [
   { name: "StackYup Emerald", hex: "#079653", pill: "#EAF8F0" },
   { name: "Electric Indigo", hex: "#4F46E5", pill: "#EEF2FF" },
@@ -44,6 +46,7 @@ export default function ThemeClient({
   initialTagline,
 }: ThemeClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [brandColor, setBrandColor] = useState(initialBrandColor || "#079653");
   const [font, setFont] = useState(initialFont || "Plus Jakarta Sans");
   const [loading, setLoading] = useState(false);
@@ -68,17 +71,17 @@ export default function ThemeClient({
         setTimeout(() => setSuccess(null), 3000);
         router.refresh();
       } else {
-        alert("Failed to save theme settings");
+        dialog.error("Gagal Menyimpan", "Gagal menyimpan konfigurasi tema dan font.");
       }
-    } catch (err) {
-      console.error("Save theme error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menyimpan", err.message || "Gagal menghubungi server.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-6 font-sans max-w-5xl">
+    <div className="space-y-6 font-sans max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#667085] block mb-1">
@@ -110,9 +113,9 @@ export default function ThemeClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left: Controls */}
-        <div className="lg:col-span-7 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+        {/* Left: Styling Controls (Accent Color + Typography) */}
+        <div className="xl:col-span-7 space-y-6">
           {/* Brand Accent Color */}
           <div className="bg-white rounded-2xl border border-[#E6EBE8] p-6 shadow-2xs space-y-4">
             <h3 className="font-bold text-sm text-[#101313] flex items-center gap-2">
@@ -221,7 +224,7 @@ export default function ThemeClient({
         </div>
 
         {/* Right: Live Interactive Component Preview */}
-        <div className="lg:col-span-5 space-y-4 sticky top-24">
+        <div className="xl:col-span-5 space-y-4 xl:sticky xl:top-20">
           <div className="bg-white rounded-2xl border border-[#E6EBE8] p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#E6EBE8]">
               <span className="text-xs font-bold text-[#101313] flex items-center gap-1.5">

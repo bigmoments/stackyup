@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface PostRowItem {
   id: string;
@@ -38,6 +39,7 @@ export default function PostsListClient({
   initialSearch = "",
 }: PostsListClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [posts, setPosts] = useState<PostRowItem[]>(initialPosts);
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [search, setSearch] = useState<string>(initialSearch);
@@ -74,44 +76,47 @@ export default function PostsListClient({
   }
 
   async function handleDeleteSingle(post: PostRowItem) {
-    if (!confirm(`Are you sure you want to permanently delete "${post.title}"?`)) return;
+    const ok = await dialog.dangerConfirm(
+      `Apakah Anda yakin ingin menghapus permanen artikel "${post.title}"? Tindakan ini tidak dapat dibatalkan.`,
+      "Hapus Artikel"
+    );
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/posts/${post.id}`, { method: "DELETE" });
       if (res.ok) {
         setPosts((prev) => prev.filter((p) => p.id !== post.id));
         setSelectedIds((prev) => prev.filter((id) => id !== post.id));
-        setSuccess(`Article "${post.title}" deleted.`);
-        setTimeout(() => setSuccess(null), 3000);
+        dialog.success(`Artikel "${post.title}" berhasil dihapus.`, "Berhasil Dihapus");
         router.refresh();
       } else {
         const data = await res.json();
-        alert(data.error?.message || "Failed to delete post");
+        dialog.error(data.error?.message || "Gagal menghapus artikel.", "Gagal");
       }
     } catch (err) {
       console.error("Delete post error:", err);
+      dialog.error("Terjadi kesalahan jaringan saat menghapus artikel.", "Gagal");
     }
   }
 
   async function handleBulkDelete() {
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedIds.length} selected article(s)? This cannot be undone.`
-      )
-    )
-      return;
+    const ok = await dialog.dangerConfirm(
+      `Apakah Anda yakin ingin menghapus ${selectedIds.length} artikel terpilih? Tindakan ini tidak dapat dibatalkan.`,
+      "Hapus Banyak Artikel"
+    );
+    if (!ok) return;
 
     try {
       for (const id of selectedIds) {
         await fetch(`/api/admin/posts/${id}`, { method: "DELETE" }).catch(() => {});
       }
       setPosts((prev) => prev.filter((p) => !selectedIds.includes(p.id)));
-      setSuccess(`Deleted ${selectedIds.length} article(s).`);
+      dialog.success(`Berhasil menghapus ${selectedIds.length} artikel.`, "Berhasil");
       setSelectedIds([]);
-      setTimeout(() => setSuccess(null), 3000);
       router.refresh();
     } catch (err) {
       console.error("Bulk delete error:", err);
+      dialog.error("Gagal melakukan penghapusan massal.", "Gagal");
     }
   }
 

@@ -255,10 +255,18 @@ async function runLiveHttpTests() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${API_KEY}` },
       });
-      assert(deleteRes.status === 200, `Deleted live test post ${createdPostId}`);
+      assert(deleteRes.status === 204 || deleteRes.status === 200, `Deleted live test post ${createdPostId} (HTTP ${deleteRes.status})`);
+    }
+
+    if (uploadedMediaId) {
+      const deleteMediaRes = await fetch(`${BASE_URL}/api/v1/media/${uploadedMediaId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${API_KEY}` },
+      });
+      assert(deleteMediaRes.status === 204 || deleteMediaRes.status === 200, `Deleted live test media ${uploadedMediaId} (HTTP ${deleteMediaRes.status})`);
     }
   } catch (err: any) {
-    assert(false, "Post cleanup failed", err.message);
+    assert(false, "Cleanup failed", err.message);
   }
 
   console.log(`\n==========================================================`);

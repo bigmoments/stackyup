@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Mail, Check, TrendingUp, Tag, Eye } from "lucide-react";
 import AdSlot from "./AdSlot";
 
+import { DBAdPlacement } from "@/lib/ads-shared";
+
 interface SidebarPost {
   id: string;
   title: string;
@@ -17,9 +19,13 @@ interface SidebarPost {
 
 interface MediumSidebarProps {
   staffPicks?: SidebarPost[];
+  adPlacement?: DBAdPlacement;
 }
 
-export default function MediumSidebar({ staffPicks = [] }: MediumSidebarProps) {
+export default function MediumSidebar({
+  staffPicks = [],
+  adPlacement,
+}: MediumSidebarProps) {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
 
@@ -140,7 +146,11 @@ export default function MediumSidebar({ staffPicks = [] }: MediumSidebarProps) {
       </div>
 
       {/* 4. Responsive Sidebar Ad */}
-      <AdSlot variant="sidebar" slotId="home-sidebar" />
+      <AdSlot
+        variant="sidebar"
+        slotId="home-sidebar"
+        placement={adPlacement}
+      />
     </aside>
   );
 }

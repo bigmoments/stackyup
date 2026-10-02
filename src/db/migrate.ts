@@ -100,6 +100,7 @@ export async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);`,
 
     `ALTER TABLE posts ADD COLUMN IF NOT EXISTS claps INTEGER DEFAULT 0 NOT NULL;`,
+    `ALTER TABLE posts ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0 NOT NULL;`,
     `ALTER TABLE posts ADD COLUMN IF NOT EXISTS author_name VARCHAR(100);`,
     `ALTER TABLE posts ALTER COLUMN author_name DROP NOT NULL;`,
     `ALTER TABLE comments ADD COLUMN IF NOT EXISTS post_title VARCHAR(255);`,
@@ -154,6 +155,51 @@ export async function runMigrations() {
     `CREATE TABLE IF NOT EXISTS site_settings (
       key VARCHAR(100) PRIMARY KEY,
       value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS authors (
+      id VARCHAR(64) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      slug VARCHAR(100) NOT NULL UNIQUE,
+      role VARCHAR(100),
+      bio TEXT,
+      avatar_url TEXT,
+      website_url TEXT,
+      twitter_handle VARCHAR(50),
+      is_default BOOLEAN DEFAULT FALSE NOT NULL,
+      article_count INTEGER DEFAULT 0 NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS affiliates (
+      id VARCHAR(64) PRIMARY KEY,
+      brand VARCHAR(100) NOT NULL,
+      url TEXT NOT NULL,
+      category VARCHAR(100),
+      default_anchor_text VARCHAR(150),
+      status VARCHAR(30) DEFAULT 'active' NOT NULL,
+      disclosure_text TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS ad_slots (
+      id VARCHAR(64) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      position VARCHAR(50) NOT NULL,
+      network VARCHAR(50) DEFAULT 'adsense' NOT NULL,
+      ad_client VARCHAR(100),
+      ad_slot VARCHAR(100),
+      format VARCHAR(50) DEFAULT 'auto',
+      responsive BOOLEAN DEFAULT TRUE NOT NULL,
+      status VARCHAR(30) DEFAULT 'active' NOT NULL,
+      show_on VARCHAR(50) DEFAULT 'all' NOT NULL,
+      exclude_slugs JSONB DEFAULT '[]'::jsonb NOT NULL,
+      custom_code TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
     );`
   ];

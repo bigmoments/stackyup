@@ -1,11 +1,12 @@
 export type AdType = "adsense" | "custom" | "none";
 
 export interface CustomAdBanner {
+  format?: "image" | "card";
   badge?: string;
-  title: string;
+  title?: string;
   highlightText?: string;
-  description: string;
-  ctaText: string;
+  description?: string;
+  ctaText?: string;
   ctaUrl: string;
   imageUrl?: string;
   theme?: "dark" | "light" | "green";

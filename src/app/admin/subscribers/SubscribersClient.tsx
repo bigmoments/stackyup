@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Plus, Download, Trash2, Search, Mail, AlertCircle } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface Subscriber {
   id: string;
@@ -14,6 +15,7 @@ interface Subscriber {
 
 export default function SubscribersClient({ initialSubscribers }: { initialSubscribers: any[] }) {
   const router = useRouter();
+  const dialog = useDialog();
   const [subscribers, setSubscribers] = useState<Subscriber[]>(initialSubscribers);
   const [search, setSearch] = useState("");
   const [emailInput, setEmailInput] = useState("");
@@ -53,16 +55,25 @@ export default function SubscribersClient({ initialSubscribers }: { initialSubsc
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Remove this subscriber?")) return;
+  async function handleDelete(id: string, email: string) {
+    const ok = await dialog.dangerConfirm(
+      `Hapus Pelanggan "${email}"?`,
+      "Pelanggan ini akan dihapus dari daftar kontak newsletter dan tidak akan menerima buletin email di masa mendatang.",
+      "Ya, Hapus Pelanggan"
+    );
+    if (!ok) return;
+
     try {
       const res = await fetch(`/api/admin/subscribers?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         setSubscribers((prev) => prev.filter((s) => s.id !== id));
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        dialog.error("Gagal Menghapus", data.error?.message || "Gagal menghapus pelanggan.");
       }
-    } catch (err) {
-      console.error("Delete subscriber failed:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -196,7 +207,7 @@ export default function SubscribersClient({ initialSubscribers }: { initialSubsc
                     <td className="py-2.5 px-3 text-right">
                       <button
                         type="button"
-                        onClick={() => handleDelete(sub.id)}
+                        onClick={() => handleDelete(sub.id, sub.email)}
                         className="p-1.5 rounded-lg text-[#8a9099] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                         title="Delete Subscriber"
                       >

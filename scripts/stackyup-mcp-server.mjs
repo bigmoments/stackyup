@@ -95,6 +95,68 @@ const TOOLS = [
     },
   },
   {
+    name: "stackyup_list_posts",
+    description: "Retrieves list of posts with optional filtering by status (published, draft, scheduled), search query, and tag.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["all", "draft", "scheduled", "published"], default: "all" },
+        q: { type: "string", description: "Search keyword" },
+        tag: { type: "string", description: "Tag name" },
+        limit: { type: "integer", default: 20 },
+        offset: { type: "integer", default: 0 },
+      },
+    },
+  },
+  {
+    name: "stackyup_update_post",
+    description: "Updates article content, title, tags, meta, or status for an existing post draft.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id_or_slug: { type: "string", description: "Article ID ('p_...') or slug to update" },
+        title: { type: "string" },
+        content_html: { type: "string" },
+        meta_description: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
+        featured_image_url: { type: "string" },
+        featured_image_alt: { type: "string" },
+        status: { type: "string", enum: ["draft", "scheduled", "published"] },
+      },
+      required: ["id_or_slug"],
+    },
+  },
+  {
+    name: "stackyup_get_settings",
+    description: "Retrieves public site settings including default_author_name, site_name, and public URLs.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "stackyup_delete_post",
+    description: "Permanently deletes an article draft or post by ID or slug. Returns 204 No Content on success.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id_or_slug: { type: "string", description: "Article ID ('p_...') or slug" },
+      },
+      required: ["id_or_slug"],
+    },
+  },
+  {
+    name: "stackyup_delete_media",
+    description: "Permanently deletes a media image asset by ID ('m_...'). Returns 204 No Content on success.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Media ID ('m_...')" },
+      },
+      required: ["id"],
+    },
+  },
+  {
     name: "stackyup_list_affiliates",
     description: "Fetches active affiliate partner links, brand names, and shortcode IDs to embed [affiliate id=\"...\"] tags.",
     inputSchema: {
@@ -183,6 +245,74 @@ async function handleToolCall(name, args) {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(`Publish post failed [${res.status}]: ${JSON.stringify(json)}`);
+  if (name === "stackyup_list_posts") {
+    const params = new URLSearchParams();
+    if (args.status) params.set("status", args.status);
+    if (args.q) params.set("q", args.q);
+    if (args.tag) params.set("tag", args.tag);
+    if (args.limit) params.set("limit", String(args.limit));
+    if (args.offset) params.set("offset", String(args.offset));
+
+    const res = await fetch(`${CMS_BASE_URL}/posts?${params.toString()}`, {
+      method: "GET",
+      headers,
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(`List posts failed [${res.status}]: ${JSON.stringify(json)}`);
+    return json;
+  }
+
+  if (name === "stackyup_update_post") {
+    const { id_or_slug, ...patchData } = args;
+    const target = encodeURIComponent(id_or_slug);
+    const res = await fetch(`${CMS_BASE_URL}/posts/${target}`, {
+      method: "PATCH",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(patchData),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(`Update post failed [${res.status}]: ${JSON.stringify(json)}`);
+    return json;
+  }
+
+  if (name === "stackyup_get_settings") {
+    const res = await fetch(`${CMS_BASE_URL}/settings`, {
+      method: "GET",
+      headers,
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(`Get settings failed [${res.status}]: ${JSON.stringify(json)}`);
+    return json;
+  }
+
+  if (name === "stackyup_delete_post") {
+    const target = encodeURIComponent(args.id_or_slug);
+    const res = await fetch(`${CMS_BASE_URL}/posts/${target}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (res.status === 204) {
+      return { success: true, message: `Post ${args.id_or_slug} deleted successfully.` };
+    }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`Delete post failed [${res.status}]: ${JSON.stringify(json)}`);
+    return json;
+  }
+
+  if (name === "stackyup_delete_media") {
+    const target = encodeURIComponent(args.id);
+    const res = await fetch(`${CMS_BASE_URL}/media/${target}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (res.status === 204) {
+      return { success: true, message: `Media ${args.id} deleted successfully.` };
+    }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`Delete media failed [${res.status}]: ${JSON.stringify(json)}`);
     return json;
   }
 

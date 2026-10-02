@@ -260,7 +260,7 @@ async function runAiAndMcpTests() {
         headers: { Authorization: `Bearer ${masterApiKey}` },
       });
       const deleteRes = await deletePostRoute(deleteReq, { params: Promise.resolve({ id: createdPostId }) });
-      assert(deleteRes.status === 200, "Cleaned up test post from DB");
+      assert(deleteRes.status === 204 || deleteRes.status === 200, "Cleaned up test post from DB");
     }
   } catch (err: any) {
     assert(false, "Autonomous pipeline test failed", err.message);

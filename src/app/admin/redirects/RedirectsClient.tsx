@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CornerDownRight, Plus, Trash2, AlertCircle } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface RedirectItem {
   id: string;
@@ -13,6 +14,7 @@ interface RedirectItem {
 
 export default function RedirectsClient({ initialRedirects }: { initialRedirects: RedirectItem[] }) {
   const router = useRouter();
+  const dialog = useDialog();
   const [redirects, setRedirects] = useState<RedirectItem[]>(initialRedirects);
   const [fromPath, setFromPath] = useState("");
   const [toPath, setToPath] = useState("");
@@ -50,16 +52,25 @@ export default function RedirectsClient({ initialRedirects }: { initialRedirects
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this redirect rule?")) return;
+  async function handleDelete(item: RedirectItem) {
+    const ok = await dialog.dangerConfirm(
+      `Hapus Pengalihan "${item.fromPath}"?`,
+      `Aturan pengalihan (status ${item.statusCode}) ke "${item.toPath}" akan dihapus. Pengunjung tautan lama mungkin menerima halaman 404.`,
+      "Ya, Hapus Pengalihan"
+    );
+    if (!ok) return;
+
     try {
-      const res = await fetch(`/api/admin/redirects?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/redirects?id=${item.id}`, { method: "DELETE" });
       if (res.ok) {
-        setRedirects((prev) => prev.filter((r) => r.id !== id));
+        setRedirects((prev) => prev.filter((r) => r.id !== item.id));
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        dialog.error("Gagal Menghapus", data.error?.message || "Gagal menghapus aturan pengalihan.");
       }
-    } catch (err) {
-      console.error("Delete redirect failed:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -176,7 +187,7 @@ export default function RedirectsClient({ initialRedirects }: { initialRedirects
                       <td className="py-3 px-5 text-right">
                         <button
                           type="button"
-                          onClick={() => handleDelete(r.id)}
+                          onClick={() => handleDelete(r)}
                           className="p-1.5 rounded-lg text-[#8a9099] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                           title="Delete Redirect"
                         >

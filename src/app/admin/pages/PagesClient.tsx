@@ -15,6 +15,7 @@ import {
   FileText,
   Save,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface PageItem {
   id: string;
@@ -29,6 +30,7 @@ export interface PageItem {
 
 export default function PagesClient({ initialPages }: { initialPages: PageItem[] }) {
   const router = useRouter();
+  const dialog = useDialog();
   const [pages, setPages] = useState<PageItem[]>(initialPages);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<PageItem | null>(null);
@@ -157,21 +159,30 @@ export default function PagesClient({ initialPages }: { initialPages: PageItem[]
   }
 
   async function handleDelete(page: PageItem) {
-    if (!confirm(`Are you sure you want to permanently delete page "${page.title}"?`)) return;
+    const ok = await dialog.dangerConfirm(
+      `Hapus Halaman "${page.title}"?`,
+      "Halaman statis ini akan dihapus secara permanen dari situs Anda. Tindakan ini tidak dapat dibatalkan.",
+      "Ya, Hapus Halaman"
+    );
+    if (!ok) return;
 
     try {
-      const res = await fetch(`/api/v1/pages/${page.id}`, { method: "DELETE" });
+      const headers: Record<string, string> = {};
+      if (process.env.NEXT_PUBLIC_CMS_API_KEY) {
+        headers["Authorization"] = `Bearer ${process.env.NEXT_PUBLIC_CMS_API_KEY}`;
+      }
+      const res = await fetch(`/api/v1/pages/${page.id}`, { method: "DELETE", headers });
       if (res.ok) {
         setPages((prev) => prev.filter((p) => p.id !== page.id));
         setSuccess(`Page "${page.title}" deleted.`);
         setTimeout(() => setSuccess(null), 3000);
         router.refresh();
       } else {
-        const data = await res.json();
-        alert(data.error?.message || "Failed to delete page");
+        const data = await res.json().catch(() => ({}));
+        dialog.error("Gagal Menghapus", data.error?.message || "Gagal menghapus halaman statis.");
       }
-    } catch (err) {
-      console.error("Delete page error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -190,14 +201,13 @@ export default function PagesClient({ initialPages }: { initialPages: PageItem[]
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#079653] hover:bg-[#068046] text-white font-semibold text-xs transition shadow-xs cursor-pointer self-start sm:self-auto"
+        <Link
+          href="/admin/pages/new"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#079653] hover:bg-[#068046] text-white font-semibold text-xs transition shadow-xs self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>+ Create New Page</span>
-        </button>
+        </Link>
       </div>
 
       {success && (
@@ -273,14 +283,13 @@ export default function PagesClient({ initialPages }: { initialPages: PageItem[]
                         >
                           <ExternalLink className="w-4 h-4" />
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(p)}
-                          className="p-1.5 rounded-lg text-[#667085] hover:text-[#079653] hover:bg-[#EAF8F0] transition cursor-pointer"
+                        <Link
+                          href={`/admin/pages/${p.id}/edit`}
+                          className="p-1.5 rounded-lg text-[#667085] hover:text-[#079653] hover:bg-[#EAF8F0] transition"
                           title="Edit Page"
                         >
                           <Edit2 className="w-4 h-4" />
-                        </button>
+                        </Link>
                         <button
                           type="button"
                           onClick={() => handleDelete(p)}

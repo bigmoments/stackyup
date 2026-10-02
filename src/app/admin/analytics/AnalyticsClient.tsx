@@ -17,6 +17,7 @@ import {
   AlertCircle,
   ThumbsUp,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface AnalyticsPostSummary {
   id: string;
@@ -51,6 +52,7 @@ export default function AnalyticsClient({
   initialPlausible,
 }: AnalyticsClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [gaId, setGaId] = useState(initialGaId);
   const [plausible, setPlausible] = useState(initialPlausible);
   const [loading, setLoading] = useState(false);
@@ -76,10 +78,10 @@ export default function AnalyticsClient({
         setTimeout(() => setSaved(false), 3000);
         router.refresh();
       } else {
-        alert("Failed to save tracking settings");
+        dialog.error("Gagal Menyimpan", "Gagal menyimpan konfigurasi analitik.");
       }
-    } catch (err) {
-      console.error("Save tracking error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menyimpan", err.message || "Gagal menghubungi server.");
     } finally {
       setLoading(false);
     }
@@ -111,12 +113,12 @@ export default function AnalyticsClient({
       {/* Real Core Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-white border border-[#E6EBE8] shadow-2xs space-y-1">
-          <span className="text-xs text-[#667085]">Estimated Total Reads</span>
+          <span className="text-xs text-[#667085]">Total Article Views</span>
           <span className="text-2xl font-extrabold text-[#101313] block">
             {stats.estimatedViews.toLocaleString()}
           </span>
           <span className="text-[11px] text-[#079653] font-bold">
-            From {stats.totalPublished} published articles
+            Live metrics &amp; engagement
           </span>
         </div>
 
@@ -166,7 +168,7 @@ export default function AnalyticsClient({
                     <th className="py-2.5 px-3">Article Title</th>
                     <th className="py-2.5 px-3">Category</th>
                     <th className="py-2.5 px-3 text-center">Claps</th>
-                    <th className="py-2.5 px-3 text-center">Est. Views</th>
+                    <th className="py-2.5 px-3 text-center">Views</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>

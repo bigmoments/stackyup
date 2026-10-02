@@ -24,6 +24,7 @@ export const posts = pgTable("posts", {
   tags: jsonb("tags").$type<string[]>().default([]).notNull(),
   faqJson: jsonb("faq_json").$type<{ question: string; answer: string }[]>().default([]),
   claps: integer("claps").default(0).notNull(),
+  views: integer("views").default(0).notNull(),
   authorName: varchar("author_name", { length: 100 }), // Nullable; null indicates fallback to Site Settings
   status: varchar("status", { length: 20 }).default("draft").notNull(), // 'draft' | 'scheduled' | 'published'
   publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -151,4 +152,53 @@ export const siteSettings = pgTable("site_settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// 15. Authors table
+export const authors = pgTable("authors", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  role: varchar("role", { length: 100 }), // e.g. "Founder & Lead Writer", "Guest Contributor"
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  websiteUrl: text("website_url"),
+  twitterHandle: varchar("twitter_handle", { length: 50 }),
+  isDefault: boolean("is_default").default(false).notNull(),
+  articleCount: integer("article_count").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 16. Affiliates table (Dedicated entity for API & Admin)
+export const affiliates = pgTable("affiliates", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  url: text("url").notNull(),
+  category: varchar("category", { length: 100 }),
+  defaultAnchorText: varchar("default_anchor_text", { length: 150 }),
+  status: varchar("status", { length: 30 }).default("active").notNull(), // 'active' | 'inactive' | 'paused'
+  disclosureText: text("disclosure_text"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 17. Ad Slots table (Dedicated entity for API & Theme placement)
+export const adSlots = pgTable("ad_slots", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  position: varchar("position", { length: 50 }).notNull(), // 'header' | 'below_title' | 'in_content' | 'after_content' | 'sidebar' | 'footer'
+  network: varchar("network", { length: 50 }).default("adsense").notNull(), // 'adsense' | 'custom' | 'direct'
+  adClient: varchar("ad_client", { length: 100 }),
+  adSlot: varchar("ad_slot", { length: 100 }),
+  format: varchar("format", { length: 50 }).default("auto"), // 'auto' | 'fluid' | 'rectangle' | 'banner'
+  responsive: boolean("responsive").default(true).notNull(),
+  status: varchar("status", { length: 30 }).default("active").notNull(), // 'active' | 'inactive'
+  showOn: varchar("show_on", { length: 50 }).default("all").notNull(), // 'all' | 'posts_only' | 'home_only'
+  excludeSlugs: jsonb("exclude_slugs").$type<string[]>().default([]).notNull(),
+  customCode: text("custom_code"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 

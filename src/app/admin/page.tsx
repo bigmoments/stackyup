@@ -1,5 +1,6 @@
 import { count, eq, desc } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { getGA4AnalyticsReport } from "@/lib/google-analytics";
 import AdminDashboardClient from "./AdminDashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function AdminDashboardPage() {
     commentsTotalCount,
     subscribersCount,
     recentPosts,
+    gaReport,
   ] = await Promise.all([
     db
       .select({ count: count() })
@@ -50,20 +52,24 @@ export default async function AdminDashboardPage() {
       .orderBy(desc(schema.posts.createdAt))
       .limit(10)
       .catch(() => []),
+    getGA4AnalyticsReport().catch(() => null),
   ]);
 
   const publishedValue = publishedPostsCount[0]?.count ?? 0;
   const subscribersValue = subscribersCount[0]?.count ?? 0;
   const commentsValue = commentsTotalCount[0]?.count ?? 0;
 
-  // Calculate views dynamically from real claps and published state
-  const calculatedTotalViews = recentPosts.reduce(
-    (acc, p) => acc + (p.claps || 0) * 14 + (p.status === "published" ? 120 : 0),
+  // Real Google Analytics views or calculated fallback
+  const calculatedTotalViews = gaReport?.totalViews ?? recentPosts.reduce(
+    (acc, p) => acc + (p.views || (p.claps || 0) * 14 + (p.status === "published" ? 120 : 0)),
     0
   );
 
   const tablePosts = recentPosts.map((p) => {
     const tags = (p.tags as string[]) || [];
+    const gaViews = gaReport?.viewsBySlug?.[p.slug];
+    const postViews = gaViews !== undefined ? gaViews : (p.views || (p.claps || 0) * 14 + (p.status === "published" ? 120 : 0));
+
     return {
       id: p.id,
       title: p.title,
@@ -81,7 +87,7 @@ export default async function AdminDashboardPage() {
             day: "numeric",
             year: "numeric",
           }),
-      views: (p.claps || 0) * 14 + (p.status === "published" ? 120 : 0),
+      views: postViews,
       comments: 0,
       featuredImageUrl: p.featuredImageUrl,
     };

@@ -72,6 +72,7 @@ import {
   Download,
   FileDown,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface PostEditorData {
   id?: string;
@@ -228,7 +229,41 @@ export default function PostEditor({ initialData, isEdit = false }: PostEditorPr
   const [metaDescription, setMetaDescription] = useState(initialData?.metaDescription || "");
   const [featuredImageUrl, setFeaturedImageUrl] = useState(initialData?.featuredImageUrl || "");
   const [featuredImageAlt, setFeaturedImageAlt] = useState(initialData?.featuredImageAlt || "");
-  const [authorName, setAuthorName] = useState(initialData?.authorName || "Adit");
+  const [authorName, setAuthorName] = useState(initialData?.authorName || "");
+  const [availableAuthors, setAvailableAuthors] = useState<Array<{ id: string; name: string; role?: string | null; isDefault: boolean }>>([
+    { id: "auth_adit", name: "Adit", role: "Lead Editor & Founder", isDefault: true },
+    { id: "auth_editorial", name: "StackYup Editorial Team", role: "Editorial Desk", isDefault: false },
+    { id: "auth_reviewer", name: "Guest Tech Reviewer", role: "Guest Contributor", isDefault: false },
+    { id: "auth_hermes", name: "Hermes AI Benchmark", role: "Automated Benchmark Reporter", isDefault: false },
+    { id: "auth_muse", name: "Muse AI Publisher", role: "Autonomous Publisher", isDefault: false },
+  ]);
+
+  // Load registered authors dynamically
+  useEffect(() => {
+    async function loadAuthors() {
+      try {
+        const res = await fetch("/api/admin/authors");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data?.authors && json.data.authors.length > 0) {
+            setAvailableAuthors(json.data.authors);
+            // If new post without author, pick default author
+            if (!initialData?.authorName) {
+              const defaultAuth = json.data.authors.find((a: any) => a.isDefault);
+              if (defaultAuth) {
+                setAuthorName(defaultAuth.name);
+              } else if (!authorName) {
+                setAuthorName(json.data.authors[0].name);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load authors in PostEditor:", e);
+      }
+    }
+    loadAuthors();
+  }, []);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(initialData?.tags || ["AI Tools"]);
   const [faq, setFaq] = useState<{ question: string; answer: string }[]>(initialData?.faq || []);
@@ -560,28 +595,41 @@ export default function PostEditor({ initialData, isEdit = false }: PostEditorPr
     }
   }
 
-  // Image Insertion directly into article content
-  function handleInsertInlineImage() {
-    if (!inlineImageUrl.trim()) return;
-    const alignClasses =
-      inlineImageAlign === "center"
-        ? "mx-auto block text-center"
-        : inlineImageAlign === "left"
-        ? "float-left mr-6 mb-4 max-w-sm"
-        : inlineImageAlign === "right"
-        ? "float-right ml-6 mb-4 max-w-sm"
-        : "w-full block";
+  const [inlineMediaId, setInlineMediaId] = useState<string | null>(null);
 
-    const imageHtml = `
+  // Image Insertion directly into article content
+  function handleInsertInlineImage(asShortcode = false) {
+    if (!inlineImageUrl.trim() && !inlineMediaId) return;
+
+    if (asShortcode) {
+      const id = inlineMediaId || inlineImageUrl.trim();
+      const altAttr = inlineImageAlt.trim() ? ` alt="${inlineImageAlt.trim()}"` : "";
+      const capAttr = inlineImageCaption.trim() ? ` caption="${inlineImageCaption.trim()}"` : "";
+      const shortcode = `[img id="${id}"${altAttr}${capAttr}]`;
+      insertCustomHtml(viewMode === "visual" ? `<p>${shortcode}</p>` : `\n${shortcode}\n`);
+    } else {
+      const alignClasses =
+        inlineImageAlign === "center"
+          ? "mx-auto block text-center"
+          : inlineImageAlign === "left"
+          ? "float-left mr-6 mb-4 max-w-sm"
+          : inlineImageAlign === "right"
+          ? "float-right ml-6 mb-4 max-w-sm"
+          : "w-full block";
+
+      const imageHtml = `
 <figure class="my-6 ${alignClasses}">
   <img src="${inlineImageUrl.trim()}" alt="${inlineImageAlt.trim() || "Article image"}" class="rounded-xl border border-[#e8ece9] shadow-xs w-full max-h-[520px] object-cover" loading="lazy" />
   ${inlineImageCaption.trim() ? `<figcaption class="text-xs text-[#667085] mt-2 italic text-center">${inlineImageCaption.trim()}</figcaption>` : ""}
 </figure>
 <p></p>`;
 
-    insertCustomHtml(imageHtml);
+      insertCustomHtml(imageHtml);
+    }
+
     setShowImageModal(false);
     setInlineImageUrl("");
+    setInlineMediaId(null);
     setInlineImageAlt("");
     setInlineImageCaption("");
     setFloatingImage(null);
@@ -630,6 +678,7 @@ export default function PostEditor({ initialData, isEdit = false }: PostEditorPr
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "Failed to upload");
       setInlineImageUrl(data.url);
+      if (data.id) setInlineMediaId(data.id);
       if (!inlineImageAlt) setInlineImageAlt(file.name.replace(/\.[^/.]+$/, ""));
       setFeedback({ type: "success", message: "Image uploaded! Ready to embed." });
     } catch (err: any) {
@@ -951,10 +1000,17 @@ export default function PostEditor({ initialData, isEdit = false }: PostEditorPr
     }
   }
 
+  const dialog = useDialog();
+
   // Delete article
   async function handleDelete() {
     if (!initialData?.id) return;
-    if (!confirm("Are you sure you want to permanently delete this article? This action cannot be undone.")) return;
+    const ok = await dialog.dangerConfirm(
+      `Hapus Artikel "${title || initialData.title}"?`,
+      "Artikel ini akan dihapus secara permanen dari basis data publikasi. Tindakan ini tidak dapat dibatalkan.",
+      "Ya, Hapus Artikel"
+    );
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/v1/posts/${initialData.id}`, {
@@ -967,6 +1023,7 @@ export default function PostEditor({ initialData, isEdit = false }: PostEditorPr
       router.refresh();
     } catch (err: any) {
       setFeedback({ type: "error", message: err.message || "Failed to delete" });
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghapus artikel.");
     }
   }
 
@@ -2074,17 +2131,30 @@ ${contentHtml}
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-[#667085] mb-1">Author Attribution</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#667085]">Author Attribution</label>
+                  <Link
+                    href="/admin/authors"
+                    target="_blank"
+                    className="text-[10px] text-[#079653] hover:underline font-medium"
+                  >
+                    + Manage Authors
+                  </Link>
+                </div>
                 <select
                   value={authorName}
                   onChange={(e) => setAuthorName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-[#F8FAF9] border border-[#E6EBE8] text-xs text-[#101313] focus:outline-none focus:border-[#078a4b]"
                 >
-                  <option value="Adit">Adit (Lead Editor & Founder)</option>
-                  <option value="StackYup Editorial Team">StackYup Editorial Team</option>
-                  <option value="Guest Tech Reviewer">Guest Tech Reviewer</option>
-                  <option value="Hermes AI Benchmark">Hermes AI Benchmark</option>
-                  <option value="Muse AI Publisher">Muse AI Publisher</option>
+                  {availableAuthors.map((auth) => (
+                    <option key={auth.id} value={auth.name}>
+                      {auth.name} {auth.role ? `(${auth.role})` : ""} {auth.isDefault ? "★ Default" : ""}
+                    </option>
+                  ))}
+                  {/* Keep current value if not in list */}
+                  {authorName && !availableAuthors.some((a) => a.name === authorName) && (
+                    <option value={authorName}>{authorName} (Custom)</option>
+                  )}
                 </select>
               </div>
             </div>
@@ -2504,15 +2574,24 @@ ${contentHtml}
               <button
                 type="button"
                 onClick={() => setShowImageModal(false)}
-                className="px-4 py-2 rounded-xl border border-[#E6EBE8] text-xs font-semibold text-[#667085] hover:bg-[#F8FAF9]"
+                className="px-3 py-2 rounded-xl border border-[#E6EBE8] text-xs font-semibold text-[#667085] hover:bg-[#F8FAF9] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleInsertInlineImage}
+                onClick={() => handleInsertInlineImage(true)}
+                disabled={!inlineImageUrl && !inlineMediaId}
+                className="px-3.5 py-2 rounded-xl border border-[#078a4b] text-[#078a4b] hover:bg-[#EAF8F0] text-xs font-semibold disabled:opacity-50 transition cursor-pointer"
+                title="Insert as [img id=...] shortcode"
+              >
+                Insert Shortcode
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInsertInlineImage(false)}
                 disabled={!inlineImageUrl}
-                className="px-4 py-2 rounded-xl bg-[#078a4b] hover:bg-[#066a3d] text-white text-xs font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-[#078a4b] hover:bg-[#066a3d] text-white text-xs font-semibold disabled:opacity-50 transition cursor-pointer shadow-xs"
               >
                 Insert Image
               </button>

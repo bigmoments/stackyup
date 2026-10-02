@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 interface PartnerRecord {
@@ -99,6 +99,17 @@ export async function GET(
   let found = false;
 
   try {
+    // 1. Check dedicated schema.affiliates table first
+    const dbAffiliate = await db
+      .select()
+      .from(schema.affiliates)
+      .where(or(eq(schema.affiliates.id, targetId), eq(schema.affiliates.id, `aff_${targetId}`)))
+      .limit(1);
+
+    if (dbAffiliate.length > 0 && dbAffiliate[0].url) {
+      return NextResponse.redirect(dbAffiliate[0].url, 307);
+    }
+
     const record = await db
       .select()
       .from(schema.siteSettings)

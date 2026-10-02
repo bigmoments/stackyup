@@ -26,6 +26,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface PostItem {
   id: string;
@@ -73,6 +74,7 @@ export default function AdminDashboardClient({
   comments: initialComments,
 }: AdminDashboardClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
 
   // State
   const [posts, setPosts] = useState<PostItem[]>(initialPosts);
@@ -113,28 +115,43 @@ export default function AdminDashboardClient({
 
   // Delete post
   async function handleDeletePost(id: string) {
-    if (!confirm("Are you sure you want to delete this post?")) return;
+    const ok = await dialog.dangerConfirm(
+      "Apakah Anda yakin ingin menghapus artikel ini? Tindakan ini tidak dapat dibatalkan.",
+      "Hapus Artikel"
+    );
+    if (!ok) return;
+
     try {
       const res = await fetch(`/api/admin/posts/${id}`, { method: "DELETE" });
       if (res.ok) {
         setPosts((prev) => prev.filter((p) => p.id !== id));
         setDrafts((prev) => prev.filter((d) => d.id !== id));
         setSelectedPosts((prev) => prev.filter((item) => item !== id));
+        dialog.success("Artikel berhasil dihapus permanen.", "Terhapus");
         router.refresh();
+      } else {
+        dialog.error("Gagal menghapus artikel.", "Gagal");
       }
     } catch (err) {
       console.error("Failed to delete post:", err);
+      dialog.error("Terjadi kesalahan jaringan saat menghapus artikel.", "Gagal");
     }
   }
 
   // Bulk delete selected posts
   async function handleBulkDelete() {
-    if (!confirm(`Delete ${selectedPosts.length} selected post(s)?`)) return;
+    const ok = await dialog.dangerConfirm(
+      `Apakah Anda yakin ingin menghapus ${selectedPosts.length} artikel terpilih sekaligus?`,
+      "Hapus Banyak Artikel"
+    );
+    if (!ok) return;
+
     for (const id of selectedPosts) {
       await fetch(`/api/admin/posts/${id}`, { method: "DELETE" }).catch(() => {});
     }
     setPosts((prev) => prev.filter((p) => !selectedPosts.includes(p.id)));
     setSelectedPosts([]);
+    dialog.success(`${selectedPosts.length} artikel berhasil dihapus.`, "Berhasil");
     router.refresh();
   }
 

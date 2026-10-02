@@ -47,9 +47,10 @@ export default function ArticleLeftNav({
 
     function handleScroll() {
       const scrollY = window.scrollY;
+      const targetThreshold = scrollY + 100;
       for (let i = headings.length - 1; i >= 0; i--) {
         const el = document.getElementById(headings[i].id);
-        if (el && el.offsetTop - 140 <= scrollY) {
+        if (el && el.offsetTop <= targetThreshold) {
           setActiveHeadingId(headings[i].id);
           return;
         }
@@ -136,17 +137,31 @@ export default function ArticleLeftNav({
                 <li key={item.id}>
                   <a
                     href={`#${item.id}`}
-                    className={`flex items-start gap-2 py-1.5 px-2.5 rounded-lg transition-all leading-snug text-[13px] ${
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const targetEl = document.getElementById(item.id);
+                      if (targetEl) {
+                        const navOffset = 88;
+                        const elementPosition = targetEl.getBoundingClientRect().top + window.scrollY;
+                        window.scrollTo({
+                          top: elementPosition - navOffset,
+                          behavior: "smooth",
+                        });
+                        setActiveHeadingId(item.id);
+                        window.history.pushState(null, "", `#${item.id}`);
+                      }
+                    }}
+                    className={`flex items-start gap-2.5 py-1.5 px-2 rounded-lg transition-all leading-snug text-[13px] ${
                       isActive
                         ? "bg-[#f4fbf7] text-[#079653] font-semibold"
                         : "text-[#4b5563] hover:text-[#101313] hover:bg-[#f8faf9]"
-                    } ${item.level === 3 ? "ml-3 text-[12px]" : ""}`}
+                    }`}
                   >
                     <span
-                      className={`shrink-0 ${
+                      className={`w-5 shrink-0 text-left tabular-nums text-[12px] pt-[1px] ${
                         isActive
-                          ? "text-[#079653] font-semibold"
-                          : "text-[#9ca3af] font-normal"
+                          ? "text-[#079653] font-bold"
+                          : "text-[#9ca3af] font-medium"
                       }`}
                     >
                       {idx + 1}.

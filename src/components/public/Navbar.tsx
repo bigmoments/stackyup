@@ -17,14 +17,17 @@ const TOPICS = [
 
 export default function PublicNavbar() {
   const searchParams = useSearchParams();
-  const [activeTag, setActiveTag] = useState(searchParams?.get("tag") || "");
+  const [activeTag, setActiveTag] = useState(searchParams?.get("tag") || searchParams?.get("q") || "");
+  const [searchVal, setSearchVal] = useState(searchParams?.get("q") || searchParams?.get("tag") || "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     function handleExternalTagChange(e: Event) {
-      const customEvent = e as CustomEvent<string>;
-      setActiveTag(customEvent.detail || "");
+      const customEvent = e as CustomEvent<{ value: string; isTag?: boolean } | string>;
+      const val = typeof customEvent.detail === "string" ? customEvent.detail : customEvent.detail?.value || "";
+      setActiveTag(val);
+      setSearchVal(val);
     }
     window.addEventListener("stackyup:tag-change", handleExternalTagChange);
     return () => window.removeEventListener("stackyup:tag-change", handleExternalTagChange);
@@ -32,17 +35,49 @@ export default function PublicNavbar() {
 
   function handleTopicClick(e: React.MouseEvent, topicValue: string) {
     setActiveTag(topicValue);
+    setSearchVal(topicValue);
     if (typeof window !== "undefined") {
       if (window.location.pathname === "/") {
         e.preventDefault();
         const url = new URL(window.location.href);
+        url.searchParams.delete("q");
         if (topicValue) {
           url.searchParams.set("tag", topicValue);
         } else {
           url.searchParams.delete("tag");
         }
         window.history.pushState({}, "", url.pathname + (url.search || ""));
-        window.dispatchEvent(new CustomEvent("stackyup:tag-change", { detail: topicValue }));
+        window.dispatchEvent(
+          new CustomEvent("stackyup:tag-change", { detail: { value: topicValue, isTag: true } })
+        );
+      }
+    }
+  }
+
+  function handleSearchSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const query = (formData.get("q") as string)?.trim() || "";
+
+    setActiveTag(query);
+    setSearchVal(query);
+    setMobileSearchOpen(false);
+
+    if (typeof window !== "undefined") {
+      if (window.location.pathname === "/") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("tag");
+        if (query) {
+          url.searchParams.set("q", query);
+        } else {
+          url.searchParams.delete("q");
+        }
+        window.history.pushState({}, "", url.pathname + (url.search || ""));
+        window.dispatchEvent(
+          new CustomEvent("stackyup:tag-change", { detail: { value: query, isTag: false } })
+        );
+      } else {
+        window.location.href = query ? `/?q=${encodeURIComponent(query)}` : "/";
       }
     }
   }
@@ -125,6 +160,7 @@ export default function PublicNavbar() {
         <div className="flex items-center gap-3">
           {/* Desktop Search Input */}
           <form
+            onSubmit={handleSearchSubmit}
             action="/"
             method="GET"
             className="relative hidden sm:flex items-center w-64 md:w-72"
@@ -132,8 +168,9 @@ export default function PublicNavbar() {
             <Search className="w-4 h-4 text-[#8a9099] absolute left-3.5 pointer-events-none" />
             <input
               type="text"
-              name="tag"
-              defaultValue={currentTag}
+              name="q"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
               placeholder="Search articles, tools, or topics..."
               className="w-full pl-9.5 pr-3.5 py-1.5 rounded-full bg-[#f8faf9] border border-[#e8ece9] hover:border-[#d5dbd7] focus:border-[#078a4b] focus:bg-white text-xs text-[#101313] placeholder:text-[#8a9099] focus:outline-none transition-all"
             />
@@ -208,12 +245,13 @@ export default function PublicNavbar() {
       {/* Mobile Search Input Drawer */}
       {mobileSearchOpen && (
         <div className="sm:hidden px-4 py-3 border-t border-[#e8ece9] bg-[#f8faf9]">
-          <form action="/" method="GET" className="relative flex items-center">
+          <form onSubmit={handleSearchSubmit} action="/" method="GET" className="relative flex items-center">
             <Search className="w-4 h-4 text-[#8a9099] absolute left-3.5 pointer-events-none" />
             <input
               type="text"
-              name="tag"
-              defaultValue={currentTag}
+              name="q"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
               autoFocus
               placeholder="Search articles, tools, or topics..."
               className="w-full pl-9.5 pr-3.5 py-2.5 rounded-full bg-white border border-[#e8ece9] text-xs text-[#101313] focus:outline-none focus:border-[#078a4b] shadow-2xs"

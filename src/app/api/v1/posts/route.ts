@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { desc, eq, count, and } from "drizzle-orm";
+import { desc, eq, count, and, or, ilike } from "drizzle-orm";
 import { verifyApiKey } from "@/lib/auth";
 import { errorResponse, successResponse } from "@/lib/response";
 import { cleanHtml } from "@/lib/sanitizer";
@@ -47,9 +47,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let body: unknown;
+  let body: any;
   try {
     body = await request.json();
+    if (body && typeof body === "object") {
+      if (body.content_html === undefined && typeof body.html === "string") {
+        body.content_html = body.html;
+      }
+    }
   } catch {
     return errorResponse("VALIDATION_ERROR", "Invalid JSON payload in request body", null, 400);
   }
@@ -133,6 +138,12 @@ export async function POST(request: NextRequest) {
     // Invalidate Upstash Redis and Edge cache if published
     if (data.status === "published") {
       await invalidatePostCache(finalSlug);
+    } else if (data.status === "scheduled" && publishedAtDate) {
+      // Trigger QStash delayed message as backup trigger
+      const { schedulePostWithQStash } = await import("@/lib/qstash");
+      await schedulePostWithQStash(postId, publishedAtDate).catch((e) =>
+        console.warn("[QStash Schedule Trigger] Note:", e)
+      );
     }
 
     return successResponse(responsePayload, 201);
@@ -157,12 +168,29 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const statusFilter = searchParams.get("status");
+    const qParam = searchParams.get("q") || searchParams.get("search");
+    const tagParam = searchParams.get("tag");
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10), 1), 100);
     const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10), 0);
 
-    const whereClause = statusFilter && statusFilter !== "all"
-      ? eq(schema.posts.status, statusFilter)
-      : undefined;
+    const conditions = [];
+
+    if (statusFilter && statusFilter !== "all") {
+      conditions.push(eq(schema.posts.status, statusFilter));
+    }
+
+    if (qParam && qParam.trim()) {
+      const searchPattern = `%${qParam.trim()}%`;
+      conditions.push(
+        or(
+          ilike(schema.posts.title, searchPattern),
+          ilike(schema.posts.slug, searchPattern),
+          ilike(schema.posts.excerpt, searchPattern)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
 
     const [items, total] = await Promise.all([
       db
@@ -177,15 +205,23 @@ export async function GET(request: NextRequest) {
         : db.select({ value: count() }).from(schema.posts),
     ]);
 
+    // Optional in-memory tag filter if requested
+    const filteredItems = tagParam && tagParam.trim()
+      ? items.filter((p) => {
+          const tags = Array.isArray(p.tags) ? (p.tags as string[]) : [];
+          return tags.some((t) => t.toLowerCase() === tagParam.trim().toLowerCase());
+        })
+      : items;
+
     const host = request.headers.get("host") || "localhost:3000";
     const protocol = request.headers.get("x-forwarded-proto") || "http";
 
     return successResponse({
-      items: items.map((p) => formatPostResponse(p, `${protocol}://${host}/${p.slug}`)),
+      items: filteredItems.map((p) => formatPostResponse(p, `${protocol}://${host}/${p.slug}`)),
       pagination: {
         limit,
         offset,
-        total: total[0]?.value || 0,
+        total: tagParam ? filteredItems.length : total[0]?.value || 0,
       },
     });
   } catch (error) {

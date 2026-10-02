@@ -14,6 +14,7 @@ import {
   Save,
   Lock,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface AdminUserItem {
   id: string;
@@ -32,6 +33,7 @@ export default function UsersClient({
   currentUserEmail,
 }: UsersClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [admins, setAdmins] = useState<AdminUserItem[]>(initialAdmins);
 
   // Modals
@@ -121,7 +123,20 @@ export default function UsersClient({
   }
 
   async function handleDelete(adm: AdminUserItem) {
-    if (!confirm(`Are you sure you want to remove admin access for ${adm.email}?`)) return;
+    if (adm.email === currentUserEmail) {
+      dialog.error(
+        "Tidak Dapat Menghapus",
+        "Anda tidak dapat menghapus akun Anda sendiri saat sedang masuk."
+      );
+      return;
+    }
+
+    const ok = await dialog.dangerConfirm(
+      `Cabut Akses Admin "${adm.email}"?`,
+      "Pengguna ini tidak akan dapat lagi masuk ke dashboard manajemen sistem blog.",
+      "Ya, Cabut Akses"
+    );
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/users?id=${adm.id}`, { method: "DELETE" });
@@ -133,10 +148,10 @@ export default function UsersClient({
         setTimeout(() => setSuccess(null), 3000);
         router.refresh();
       } else {
-        alert(data.error?.message || "Failed to delete admin");
+        dialog.error("Gagal Menghapus", data.error?.message || "Gagal menghapus pengguna admin.");
       }
-    } catch (err) {
-      console.error("Delete user error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 

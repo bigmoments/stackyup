@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FolderTree, Plus, Trash2, Edit2, CheckCircle2, AlertCircle } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface Category {
   id: string;
@@ -57,16 +58,27 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this category?")) return;
+  const dialog = useDialog();
+
+  async function handleDelete(id: string, catName: string) {
+    const ok = await dialog.dangerConfirm(
+      `Hapus Kategori "${catName}"?`,
+      "Kategori ini akan dihapus secara permanen. Artikel yang terkait mungkin kehilangan pengelompokannya.",
+      "Ya, Hapus Kategori"
+    );
+    if (!ok) return;
+
     try {
       const res = await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         setCategories((prev) => prev.filter((c) => c.id !== id));
         router.refresh();
+      } else {
+        const data = await res.json();
+        dialog.error("Gagal Menghapus", data.error?.message || "Terjadi kesalahan saat menghapus kategori.");
       }
-    } catch (err) {
-      console.error("Delete category failed:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menghapus", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -176,7 +188,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                     <td className="py-3 px-5 text-right">
                       <button
                         type="button"
-                        onClick={() => handleDelete(cat.id)}
+                        onClick={() => handleDelete(cat.id, cat.name)}
                         className="p-1.5 rounded-lg text-[#8a9099] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                         title="Delete Category"
                       >

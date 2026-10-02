@@ -18,6 +18,7 @@ import {
   FileCode,
   Cpu,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 interface ApiKeyItem {
   id: string;
@@ -29,6 +30,7 @@ interface ApiKeyItem {
 }
 
 export default function AdminApiKeysPage() {
+  const dialog = useDialog();
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [keyNameInput, setKeyNameInput] = useState("");
@@ -87,20 +89,24 @@ export default function AdminApiKeysPage() {
     }
   }
 
-  async function handleRevoke(id: string) {
-    if (
-      !confirm(
-        "Are you sure you want to revoke and delete this API key? Automated scripts using it will fail."
-      )
-    ) {
-      return;
-    }
+  async function handleRevoke(id: string, name: string) {
+    const ok = await dialog.dangerConfirm(
+      `Cabut & Hapus API Key "${name}"?`,
+      "Kunci API ini akan dicabut secara permanen. Semua integrasi bot atau skrip otomatis yang menggunakan kunci ini akan ditolak aksesnya.",
+      "Ya, Cabut Kunci"
+    );
+    if (!ok) return;
 
     try {
-      await fetch(`/api/admin/api-keys/${id}`, { method: "DELETE" });
-      await loadKeys();
-    } catch (err) {
-      console.error("Failed to revoke key:", err);
+      const res = await fetch(`/api/admin/api-keys/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await loadKeys();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        dialog.error("Gagal Mencabut Kunci", data.error || "Gagal mencabut API key.");
+      }
+    } catch (err: any) {
+      dialog.error("Gagal Mencabut Kunci", err.message || "Gagal menghubungi server.");
     }
   }
 
@@ -489,7 +495,7 @@ export default function AdminApiKeysPage() {
                     <td className="py-3.5 px-5 text-right">
                       <button
                         type="button"
-                        onClick={() => handleRevoke(k.id)}
+                        onClick={() => handleRevoke(k.id, k.name)}
                         className="p-1.5 rounded-lg text-[#667085] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                         title="Revoke / Delete Key"
                       >

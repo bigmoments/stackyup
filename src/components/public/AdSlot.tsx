@@ -5,6 +5,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { adsConfig, AdSlotConfig } from "@/config/ads";
+import { DBAdPlacement, resolveSlotConfig } from "@/lib/ads-shared";
 
 declare global {
   interface Window {
@@ -13,10 +14,20 @@ declare global {
 }
 
 interface AdSlotProps {
-  variant: "sidebar" | "in-article" | "bottom-article" | "in-feed";
+  variant:
+    | "sidebar"
+    | "in-article"
+    | "bottom-article"
+    | "in-feed"
+    | "header"
+    | "below_title"
+    | "in_content"
+    | "after_content"
+    | "footer";
   slotId?: string;
   className?: string;
   configOverride?: Partial<AdSlotConfig>;
+  placement?: DBAdPlacement;
 }
 
 export default function AdSlot({
@@ -24,36 +35,59 @@ export default function AdSlot({
   slotId,
   className = "",
   configOverride,
+  placement,
 }: AdSlotProps) {
   const adRef = useRef<HTMLModElement | null>(null);
 
-  const slotKey =
-    variant === "in-article"
-      ? "inArticle"
-      : variant === "bottom-article"
-      ? "bottomArticle"
+  // Map variant to DB slotKey
+  const dbSlotKey =
+    variant === "in-article" || variant === "in_content"
+      ? "in_content"
+      : variant === "bottom-article" || variant === "after_content"
+      ? "after_content"
       : variant === "in-feed"
-      ? "inFeed"
+      ? "homepage_sidebar"
+      : variant === "header"
+      ? "header"
+      : variant === "below_title"
+      ? "below_title"
+      : variant === "footer"
+      ? "footer"
       : "sidebar";
 
-  const baseConfig = adsConfig.slots[slotKey];
-  const finalConfig: AdSlotConfig = { ...baseConfig, ...configOverride };
+  const resolved = resolveSlotConfig(dbSlotKey, placement);
 
-  // 1. If globally disabled or slot disabled or type is "none", render NOTHING
-  if (!adsConfig.enabled || !finalConfig.enabled || finalConfig.type === "none") {
+  const finalConfig: AdSlotConfig = {
+    enabled: resolved.enabled,
+    type: resolved.type,
+    adSlot: resolved.adSlot,
+    custom: resolved.custom,
+    ...configOverride,
+  };
+
+  const adClientId = resolved.adClient || adsConfig.adsenseClientId;
+
+  // 1. If slot disabled or type is "none", render NOTHING
+  if (!finalConfig.enabled || finalConfig.type === "none") {
     return null;
   }
 
   // 2. If type is "adsense", but AdSense is missing client ID or slot ID, DO NOT RENDER ANYTHING (NO PLACEHOLDER)
   if (finalConfig.type === "adsense") {
-    if (!adsConfig.adsenseClientId || !adsConfig.adsenseClientId.trim() || !finalConfig.adSlot) {
+    if (!adClientId || !adClientId.trim() || !finalConfig.adSlot) {
       return null;
     }
   }
 
-  // 3. If type is "custom", but custom banner is missing or has empty title, DO NOT RENDER ANYTHING (NO PLACEHOLDER)
+  // 3. If type is "custom", ensure either custom banner (card or image) or customHtml exists
   if (finalConfig.type === "custom") {
-    if (!finalConfig.custom || !finalConfig.custom.title || !finalConfig.custom.title.trim()) {
+    const hasCustomBanner = Boolean(
+      finalConfig.custom &&
+        ((finalConfig.custom.title && finalConfig.custom.title.trim()) ||
+          (finalConfig.custom.imageUrl && finalConfig.custom.imageUrl.trim()))
+    );
+    const hasCustomHtml = Boolean(resolved.customHtml && resolved.customHtml.trim());
+    if (!hasCustomBanner && !hasCustomHtml) {
       return null;
     }
   }
@@ -88,7 +122,7 @@ export default function AdSlot({
         <Script
           id="google-adsense"
           async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsConfig.adsenseClientId}`}
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adClientId}`}
           crossOrigin="anonymous"
           strategy="lazyOnload"
         />
@@ -98,7 +132,7 @@ export default function AdSlot({
             ref={adRef}
             className="adsbygoogle"
             style={{ display: "block" }}
-            data-ad-client={adsConfig.adsenseClientId}
+            data-ad-client={adClientId}
             data-ad-slot={finalConfig.adSlot}
             data-ad-format={finalConfig.adFormat || "auto"}
             data-full-width-responsive={finalConfig.fullWidthResponsive ? "true" : "false"}
@@ -109,12 +143,59 @@ export default function AdSlot({
   }
 
   // ==========================================
-  // 2. CUSTOM / AFFILIATE PROMO RENDERER
+  // 2. CUSTOM HTML RENDERER (Raw HTML snippet)
+  // ==========================================
+  if (resolved.customHtml) {
+    return (
+      <div
+        id={slotId || `ad-${variant}`}
+        className={`ad-container clear-both select-none ${className}`}
+      >
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#9ca3af] block text-center mb-1.5 font-sans">
+          SPONSORED
+        </span>
+        <div dangerouslySetInnerHTML={{ __html: resolved.customHtml }} />
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 3. STRUCTURED CUSTOM / AFFILIATE PROMO RENDERER
   // ==========================================
   const custom = finalConfig.custom;
   if (!custom) return null;
 
-  // VARIANT A: SIDEBAR (Sleek Dark v0 Card with IDE preview matching Mockup 1)
+  // ------------------------------------------
+  // Check if Pure Image Banner Mode is requested
+  // ------------------------------------------
+  const isImageOnly = custom.imageUrl && (custom.format === "image" || !custom.title);
+
+  if (isImageOnly && custom.imageUrl) {
+    return (
+      <div className={`space-y-1.5 select-none clear-both ${className}`}>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#9ca3af] block text-center font-sans">
+          {custom.badge || "SPONSORED"}
+        </span>
+
+        <a
+          href={custom.ctaUrl || "#"}
+          target={custom.ctaUrl?.startsWith("http") ? "_blank" : undefined}
+          rel={custom.ctaUrl?.startsWith("http") ? "noopener noreferrer nofollow" : undefined}
+          className="group block relative overflow-hidden rounded-2xl border border-[#eaedeb] hover:border-[#079653]/50 transition-all duration-300 shadow-2xs hover:shadow-md"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={custom.imageUrl}
+            alt={custom.title || "Sponsored Partner"}
+            className="w-full h-auto object-cover block group-hover:scale-[1.01] transition-transform duration-300"
+            loading="lazy"
+          />
+        </a>
+      </div>
+    );
+  }
+
+  // VARIANT A: SIDEBAR (Sleek Dark Card with IDE preview or banner)
   if (variant === "sidebar") {
     return (
       <div className={`space-y-1.5 select-none ${className}`}>
@@ -163,7 +244,7 @@ export default function AdSlot({
               </div>
             </div>
 
-            {/* v0 Dark IDE Mockup preview on the right (like Mockup Image 1) */}
+            {/* Dark IDE Mockup preview on the right */}
             {custom.showIdeMockup && (
               <div className="w-[105px] h-[155px] rounded-lg bg-[#141b17] border border-[#27362e] p-2 flex flex-col justify-between shrink-0 shadow-xl opacity-90 -mr-1 mt-1">
                 <div className="space-y-1.5">

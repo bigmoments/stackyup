@@ -15,6 +15,7 @@ import {
   ExternalLink,
   MoveVertical,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/CustomDialog";
 
 export interface MenuItem {
   id: string;
@@ -32,6 +33,7 @@ export default function MenusClient({
   initialFooterMenu,
 }: MenusClientProps) {
   const router = useRouter();
+  const dialog = useDialog();
   const [headerMenu, setHeaderMenu] = useState<MenuItem[]>(initialHeaderMenu);
   const [footerMenu, setFooterMenu] = useState<MenuItem[]>(initialFooterMenu);
 
@@ -122,10 +124,10 @@ export default function MenusClient({
         setTimeout(() => setSuccess(null), 3000);
         router.refresh();
       } else {
-        alert("Failed to save navigation menus");
+        dialog.error("Gagal Menyimpan", "Gagal menyimpan konfigurasi menu navigasi.");
       }
-    } catch (err) {
-      console.error("Save menus error:", err);
+    } catch (err: any) {
+      dialog.error("Gagal Menyimpan", err.message || "Gagal menghubungi server.");
     } finally {
       setLoading(false);
     }

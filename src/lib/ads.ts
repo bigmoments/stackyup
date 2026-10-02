@@ -1,14 +1,21 @@
 import { adsConfig } from "@/config/ads";
+import { DBAdPlacement, resolveSlotConfig } from "./ads-shared";
 
 /**
  * Automatically inserts an in-article advertisement slot with strict "ADVERTISEMENT" labeling
- * after paragraph 3 of the article body, fully configurable via src/config/ads.ts.
+ * after paragraph 3 of the article body, dynamically configured via DB ad placements
+ * with seamless fallback to static config.
  */
-export function injectInArticleAds(html: string): string {
+export function injectInArticleAds(
+  html: string,
+  dynamicPlacement?: DBAdPlacement
+): string {
   if (!html) return "";
 
+  const slotResolved = resolveSlotConfig("in_article", dynamicPlacement);
+
   // If globally disabled or in-article ad is disabled, don't alter the HTML
-  if (!adsConfig.enabled || !adsConfig.slots.inArticle.enabled || adsConfig.slots.inArticle.type === "none") {
+  if (!slotResolved.enabled || slotResolved.type === "none") {
     return html;
   }
 
@@ -20,12 +27,14 @@ export function injectInArticleAds(html: string): string {
     return html;
   }
 
-  const slotConfig = adsConfig.slots.inArticle;
-  const isAdSense = slotConfig.type === "adsense" && Boolean(adsConfig.adsenseClientId);
-
   let adMarkup = "";
 
-  if (isAdSense) {
+  if (slotResolved.type === "adsense") {
+    const clientId = slotResolved.adClient || adsConfig.adsenseClientId;
+    const slotId = slotResolved.adSlot || "";
+
+    if (!clientId || !slotId) return html;
+
     adMarkup = `
 <div class="my-10 clear-both text-center select-none" id="in-article-ad">
   <span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#9ca3af] block text-center mb-2 font-sans">
@@ -36,14 +45,23 @@ export function injectInArticleAds(html: string): string {
          style="display:block; text-align:center; min-height:90px; width:100%;"
          data-ad-layout="in-article"
          data-ad-format="fluid"
-         data-ad-client="${adsConfig.adsenseClientId}"
-         data-ad-slot="${slotConfig.adSlot || ''}"></ins>
+         data-ad-client="${clientId}"
+         data-ad-slot="${slotId}"></ins>
   </div>
   <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
 </div>
 `;
-  } else if (slotConfig.custom) {
-    const custom = slotConfig.custom;
+  } else if (slotResolved.customHtml) {
+    adMarkup = `
+<div class="my-10 clear-both text-center select-none" id="in-article-ad">
+  <span class="text-[10px] font-bold uppercase tracking-widest text-[#9ca3af] block mb-2 font-sans">
+    SPONSORED
+  </span>
+  ${slotResolved.customHtml}
+</div>
+`;
+  } else if (slotResolved.custom) {
+    const custom = slotResolved.custom;
     adMarkup = `
 <div class="my-10 p-5 sm:p-6 rounded-2xl bg-[#f4fbf7] border border-[#d6e8de] text-center clear-both select-none" id="in-article-ad">
   <span class="text-[10px] font-bold uppercase tracking-widest text-[#079653] block mb-1.5 font-sans">

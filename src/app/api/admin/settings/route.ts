@@ -43,7 +43,27 @@ export async function POST(request: NextRequest) {
             value,
           });
         }
+
+        // When updating default_author_name, automatically sync authors table
+        if (key === "default_author_name" && value.trim()) {
+          try {
+            await db.update(schema.authors).set({ isDefault: false });
+            await db
+              .update(schema.authors)
+              .set({ isDefault: true })
+              .where(eq(schema.authors.name, value.trim()));
+          } catch (e) {
+            // Ignore if authors table not ready
+          }
+        }
       }
+    }
+
+    try {
+      const { invalidateSiteSettingsCache } = await import("@/lib/site-settings");
+      await invalidateSiteSettingsCache();
+    } catch (e) {
+      // ignore
     }
 
     return successResponse({ message: "Settings saved successfully" });
