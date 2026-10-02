@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StackYup CMS 🚀
 
-## Getting Started
+StackYup CMS adalah platform publishing blog modern, ringan, dan gratis di-hosting (serverless), yang dibangun khusus untuk blog review software, komparasi AI tools, dan panduan produktivitas dengan target pembaca internasional (US/UK).
 
-First, run the development server:
+Platform ini dilengkapi dengan arsitektur **Hybrid Headless CMS**, antarmuka Admin yang intuitif, serta **Publishing API (v2.1) & Model Context Protocol (MCP)** untuk penerbitan artikel secara otomatis oleh AI Agent (seperti Muse, Hermes, OpenClaw).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📚 Pusat Dokumentasi Resmi
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Untuk kemudahan tim dan pengguna, dokumentasi telah dibagi secara terstruktur:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **[Dokumentasi Teknis & API Reference v2.1 (Untuk Developer)](DOKUMENTASI_TEKNIS_V2.1.md)**  
+   *Panduan mendalam arsitektur sistem:*
+   - Alur kerja sistem & data lifecycle (Draft → Scheduled → Published).
+   - Dynamic 3-Tier Author Resolution (nama penulis dinamis tanpa hardcode).
+   - Shortcode Engine (`[affiliate]` & `[img]`) dan kepatuhan otomatis FTC / Google AdSense.
+   - Pipeline sanitasi HTML ketat (allowlist tags, zero inline styles/divs).
+   - Keamanan, Idempotensi (`Idempotency-Key`), Token-Bucket Rate Limiter (60 req/menit), dan SHA-256 API Key Hashing.
+   - Skema database lengkap (14 tabel Drizzle ORM / Neon PostgreSQL).
+   - API Reference v2.1 lengkap (`/api/v1/*` & `/api/admin/*`) beserta skema OpenAPI 3.1 & Model Context Protocol (MCP).
 
-## Learn More
+2. **[Panduan Pengguna & Manual Operasional Admin (Untuk Pengguna / Master)](PANDUAN_PENGGUNA.md)**  
+   *Panduan lengkap langkah demi langkah untuk setiap fitur di dashboard:*
+   - Penjelasan fitur **Affiliate Links**: untuk apa halaman ini, cara menambah link partner, cara pasang shortcode di artikel, pelacakan klik (*Click Tracker*), dan auto-disclosure box.
+   - Menulis artikel dengan Block Editor, aturan Alt Text bahasa Inggris, indikator Meta Description (130-160 karakter), dan FAQ builder untuk rich snippets Google.
+   - Pengaturan penempatan iklan (*Advertisements*) untuk Google AdSense dan banner sponsor mandiri.
+   - Pengaturan situs & **Default Author Name** (nama pena terpusat untuk semua artikel AI).
+   - Pengelolaan halaman statis, kategori, tags, galeri media, komentar, pelanggan newsletter, pengalihan URL (Redirects 301/302), menu navigasi, dan backup data.
 
-To learn more about Next.js, take a look at the following resources:
+3. **[AI Agent Integration & Autonomous Protocol Specification (v2.1 Enterprise Spec)](AI_AGENT_INTEGRATION.md)**  
+   *Spesifikasi khusus untuk autonomous agents:* Zero-slop prompt persona, runnable Python script (`agent_runner.py`), Claude Desktop MCP configuration, dan OpenClaw orchestration spec.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🛠️ Tech Stack
 
-## Deploy on Vercel
+- **Framework**: Next.js 15 (App Router, Server Components, ISR/SSG)
+- **Bahasa**: TypeScript
+- **Database**: PostgreSQL (Neon Serverless)
+- **ORM**: Drizzle ORM
+- **Styling**: TailwindCSS & Typography
+- **Editor**: TipTap WYSIWYG
+- **Autentikasi**: Custom Secure Session Cookie (Admin) & SHA-256 Bearer Token (Publishing API)
+- **Protokol AI**: RESTful API v1, OpenAPI 3.1, Model Context Protocol (MCP)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🚀 Quick Start (Menjalankan Lokal)
+
+1. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Konfigurasi Environment:**
+   Salin `.env.example` menjadi `.env.local` dan lengkapi koneksi database:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. **Migrasi Database:**
+   ```bash
+   npm run db:push
+   ```
+
+4. **Jalankan Development Server:**
+   ```bash
+   npm run dev
+   ```
+
+5. **Akses Aplikasi:**
+   - Blog Publik: [http://localhost:3000](http://localhost:3000)
+   - Panel Admin: [http://localhost:3000/admin](http://localhost:3000/admin)
+   - Publishing API v1: [http://localhost:3000/api/v1](http://localhost:3000/api/v1)
+
+6. **Uji Validasi Protokol AI:**
+   ```bash
+   npm run test:ai
+   ```

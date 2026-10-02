@@ -46,33 +46,43 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
     faq: (post.faqJson as { question: string; answer: string }[]) || [],
     status: post.status as "draft" | "scheduled" | "published",
     publishedAt: post.publishedAt?.toISOString() || null,
+    authorName: post.authorName || "Adit",
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 font-sans">
       <PostEditor initialData={initialData} isEdit={true} />
 
       {/* Revision History Section */}
       {postRevisions.length > 0 && (
-        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-indigo-400" />
-            <h3 className="text-sm font-semibold text-white">Revision History ({postRevisions.length})</h3>
+        <div className="p-6 rounded-2xl bg-white border border-[#E6EBE8] shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6EBE8]">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-[#078a4b]" />
+              <h3 className="text-sm font-bold text-[#101313]">Revision History ({postRevisions.length})</h3>
+            </div>
+            <span className="text-xs text-[#667085]">Automatic version backups</span>
           </div>
 
-          <div className="divide-y divide-slate-800/80">
-            {postRevisions.map((rev) => (
+          <div className="divide-y divide-[#E6EBE8]">
+            {postRevisions.map((rev, idx) => (
               <div key={rev.id} className="py-3 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="text-slate-300 font-medium">{rev.title || post.title}</span>
-                  <span className="text-slate-500">
-                    — {new Date(rev.createdAt).toLocaleString()}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-[#f4fbf7] text-[#078a4b] flex items-center justify-center font-bold text-[10px]">
+                    #{postRevisions.length - idx}
+                  </div>
+                  <div>
+                    <span className="text-[#101313] font-semibold">{rev.title || post.title}</span>
+                    <span className="text-[#667085] ml-2">
+                      — {new Date(rev.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-[#8a9099] font-mono">
+                    {rev.contentHtml.length.toLocaleString()} characters
                   </span>
                 </div>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {rev.contentHtml.length} characters
-                </span>
               </div>
             ))}
           </div>

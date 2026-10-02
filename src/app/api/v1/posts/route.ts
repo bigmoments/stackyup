@@ -7,6 +7,8 @@ import { errorResponse, successResponse } from "@/lib/response";
 import { cleanHtml } from "@/lib/sanitizer";
 import { getUniqueSlug } from "@/lib/slug";
 import { checkIdempotency, saveIdempotency } from "@/lib/idempotency";
+import { formatPostResponse } from "@/lib/formatters";
+import { invalidatePostCache } from "@/lib/cache";
 import { db, schema } from "@/db";
 
 const PostCreateSchema = z.object({
@@ -21,13 +23,19 @@ const PostCreateSchema = z.object({
   faq: z.array(z.object({ question: z.string(), answer: z.string() })).optional().default([]),
   status: z.enum(["draft", "scheduled", "published"]).optional().default("draft"),
   published_at: z.string().datetime({ offset: true }).optional().nullable(),
+  author_name: z.string().max(100).optional().nullable(),
 });
 
 // POST /api/v1/posts - Create post
 export async function POST(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   // Idempotency check
@@ -94,6 +102,7 @@ export async function POST(request: NextRequest) {
       faqJson: data.faq || [],
       status: data.status,
       publishedAt: publishedAtDate,
+      authorName: data.author_name ? data.author_name.trim() : null,
     });
 
     // 5. Create initial revision record
@@ -121,6 +130,11 @@ export async function POST(request: NextRequest) {
       await saveIdempotency(idempotencyKey, 201, responsePayload);
     }
 
+    // Invalidate Upstash Redis and Edge cache if published
+    if (data.status === "published") {
+      await invalidatePostCache(finalSlug);
+    }
+
     return successResponse(responsePayload, 201);
   } catch (error) {
     console.error("Error creating post:", error);
@@ -132,7 +146,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   try {
@@ -158,8 +177,11 @@ export async function GET(request: NextRequest) {
         : db.select({ value: count() }).from(schema.posts),
     ]);
 
+    const host = request.headers.get("host") || "localhost:3000";
+    const protocol = request.headers.get("x-forwarded-proto") || "http";
+
     return successResponse({
-      items,
+      items: items.map((p) => formatPostResponse(p, `${protocol}://${host}/${p.slug}`)),
       pagination: {
         limit,
         offset,

@@ -44,6 +44,7 @@
 | tags | text[] / relasi | Label/kategori, mis. `AI Tools`, `Comparisons` |
 | status | enum | `draft` \| `scheduled` \| `published` |
 | published_at | timestamptz | Null bila draft; diisi saat publish/terjadwal |
+| author_name | varchar(100) | Nullable. Nama/persona penulis. Null = otomatis fallback ke "Default Author Name" di Site Settings |
 | faq_json | jsonb | Daftar Q&A untuk schema FAQ (opsional) |
 | created_at / updated_at | timestamptz | Audit |
 
@@ -137,6 +138,7 @@ Ini bagian terpenting: API yang memungkinkan Muse membuat artikel & mengupload g
 ```
 - `slug`: boleh dikosongkan → server generate dari judul (pastikan unik, tambah `-2`, `-3` bila perlu).
 - `status`: `draft` (default) | `scheduled` (wajib isi `published_at` ISO 8601) | `published`.
+- `author_name`: opsional (tanpa default pada request). Resolusi server: jika dikirim, disimpan sebagai override (guest author); jika kosong/null, server dan tampilan otomatis menggunakan `default_author_name` dari Site Settings. Agent secara default TIDAK perlu mengirim field ini.
 - `content_html`: server wajib sanitasi dengan allowlist tag (`p, h2, h3, ul, ol, li, table, thead, tbody, tr, th, td, strong, em, a, img, blockquote, code, pre`) dan atribut aman.
 - Response `201`:
 ```json
@@ -157,6 +159,8 @@ Ini bagian terpenting: API yang memungkinkan Muse membuat artikel & mengupload g
 | POST | `/api/v1/pages` | Buat halaman statis (field: title, slug, content_html, meta_description, status) |
 | PATCH | `/api/v1/pages/:id` | Update halaman statis |
 | GET | `/api/v1/media` | List media |
+| GET | `/api/v1/affiliates` | List partner afiliasi aktif untuk shortcode `[affiliate id="..."]` |
+| GET | `/api/v1/settings` | Konfigurasi situs publik (termasuk `default_author_name`) |
 
 ### 6.5 Format error standar
 ```json

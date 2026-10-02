@@ -6,6 +6,8 @@ import { verifyApiKey } from "@/lib/auth";
 import { errorResponse, successResponse } from "@/lib/response";
 import { cleanHtml } from "@/lib/sanitizer";
 import { getUniqueSlug } from "@/lib/slug";
+import { formatPostResponse } from "@/lib/formatters";
+import { invalidatePostCache } from "@/lib/cache";
 import { db, schema } from "@/db";
 
 const PostPatchSchema = z.object({
@@ -20,6 +22,7 @@ const PostPatchSchema = z.object({
   faq: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
   status: z.enum(["draft", "scheduled", "published"]).optional(),
   published_at: z.string().datetime({ offset: true }).optional().nullable(),
+  author_name: z.string().max(100).optional().nullable(),
 });
 
 interface RouteContext {
@@ -30,7 +33,12 @@ interface RouteContext {
 export async function GET(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   const { id } = await context.params;
@@ -53,10 +61,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const protocol = request.headers.get("x-forwarded-proto") || "http";
     const publicUrl = `${protocol}://${host}/${post.slug}`;
 
-    return successResponse({
-      ...post,
-      url: publicUrl,
-    });
+    return successResponse(formatPostResponse(post, publicUrl));
   } catch (error) {
     console.error("Error retrieving post:", error);
     return errorResponse("INTERNAL_SERVER_ERROR", "Failed to retrieve post", null, 500);
@@ -67,7 +72,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   const { id } = await context.params;
@@ -110,6 +120,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (data.featured_image_alt !== undefined) updateValues.featuredImageAlt = data.featured_image_alt;
     if (data.tags !== undefined) updateValues.tags = data.tags;
     if (data.faq !== undefined) updateValues.faqJson = data.faq;
+    if (data.author_name !== undefined && data.author_name !== null) updateValues.authorName = data.author_name;
 
     // Handle slug change
     if (data.slug && data.slug !== current.slug) {
@@ -164,10 +175,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const protocol = request.headers.get("x-forwarded-proto") || "http";
     const publicUrl = `${protocol}://${host}/${updated[0].slug}`;
 
-    return successResponse({
-      ...updated[0],
-      url: publicUrl,
-    });
+    // Invalidate Upstash Redis & Edge cache
+    await invalidatePostCache(updated[0].slug);
+    if (current.slug !== updated[0].slug) {
+      await invalidatePostCache(current.slug);
+    }
+
+    return successResponse(formatPostResponse(updated[0], publicUrl));
   } catch (error) {
     console.error("Error updating post:", error);
     return errorResponse("INTERNAL_SERVER_ERROR", "Failed to update post", null, 500);
@@ -178,14 +192,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   const { id } = await context.params;
 
   try {
     const existing = await db
-      .select({ id: schema.posts.id })
+      .select({ id: schema.posts.id, slug: schema.posts.slug })
       .from(schema.posts)
       .where(or(eq(schema.posts.id, id), eq(schema.posts.slug, id)))
       .limit(1);
@@ -195,6 +214,9 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     }
 
     await db.delete(schema.posts).where(eq(schema.posts.id, existing[0].id));
+
+    // Invalidate cache
+    await invalidatePostCache(existing[0].slug);
 
     return successResponse({ message: `Post '${id}' deleted successfully` });
   } catch (error) {

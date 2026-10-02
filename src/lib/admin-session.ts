@@ -34,11 +34,45 @@ export function verifyToken<T>(token: string): T | null {
   }
 }
 
-export async function getCurrentAdmin(): Promise<SessionData | null> {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get(COOKIE_NAME);
-  if (!sessionCookie?.value) return null;
-  return verifyToken<SessionData>(sessionCookie.value);
+export async function getCurrentAdmin(req?: Request): Promise<SessionData | null> {
+  // 1. If request is provided, try reading cookie from request headers
+  if (req) {
+    const cookieHeader = req.headers.get("cookie");
+    if (cookieHeader) {
+      const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`));
+      if (match) {
+        const token = decodeURIComponent(match[1]);
+        const verified = verifyToken<SessionData>(token);
+        if (verified) return verified;
+      }
+    }
+
+    // Also support Bearer master API key for administrative operations
+    const authHeader = req.headers.get("authorization");
+    if (authHeader) {
+      const parts = authHeader.split(" ");
+      if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+        const masterKey = process.env.CMS_API_KEY;
+        if (masterKey && parts[1].trim() === masterKey) {
+          return {
+            email: "admin@stackyup.com",
+            iat: Date.now(),
+            exp: Date.now() + 86400000,
+          };
+        }
+      }
+    }
+  }
+
+  // 2. Otherwise use cookies() from next/headers
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(COOKIE_NAME);
+    if (!sessionCookie?.value) return null;
+    return verifyToken<SessionData>(sessionCookie.value);
+  } catch {
+    return null;
+  }
 }
 
 export async function createAdminSession(email: string): Promise<string> {

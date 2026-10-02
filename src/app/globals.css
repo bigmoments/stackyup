@@ -1,48 +1,363 @@
 @import "tailwindcss";
 
-:root {
-  --background: #090d16;
-  --foreground: #f1f5f9;
-  --card-bg: #0f172a;
-  --card-border: #1e293b;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --accent: #38bdf8;
+@layer base {
+  :root {
+    --background: #ffffff;
+    --background-secondary: #f8faf9;
+    --foreground: #101313;
+    --text-primary: #101313;
+    --text-secondary: #667085;
+    --text-muted: #8a9099;
+    --border: #e8ece9;
+    --border-dark: #d5dbd7;
+    --primary-green: #078a4b;
+    --dark-green: #066a3d;
+    --soft-green: #f4fbf7;
+    --soft-green-border: #e8ece9;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
-body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  min-height: 100vh;
+/* Font family utilities */
+.font-sans {
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Custom sleek scrollbar */
+.font-serif {
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Editorial tech blog reading typography styling */
+.medium-prose,
+.article-prose {
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.75;
+  color: #101313;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 640px) {
+  .medium-prose,
+  .article-prose {
+    font-size: 18px;
+    line-height: 1.75;
+  }
+}
+
+.medium-prose p,
+.article-prose p {
+  margin-bottom: 1.5em;
+  color: #596579;
+}
+
+.medium-prose h1,
+.medium-prose h2,
+.medium-prose h3,
+.medium-prose h4,
+.article-prose h1,
+.article-prose h2,
+.article-prose h3,
+.article-prose h4 {
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 750;
+  color: #101313;
+  letter-spacing: -0.02em;
+  scroll-margin-top: 5rem;
+}
+
+/* Section 17: Thin green vertical accent before major H2 headings */
+.medium-prose h2,
+.article-prose h2 {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  font-size: 29px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-top: 2.2em;
+  margin-bottom: 0.7em;
+  font-weight: 750;
+  color: #101313;
+}
+
+.medium-prose h2::before,
+.article-prose h2::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  min-height: 32px;
+  border-radius: 9999px;
+  background-color: #079653;
+  flex-shrink: 0;
+  margin-top: 0.05em;
+}
+
+.medium-prose h3,
+.article-prose h3 {
+  font-size: 1.25em;
+  line-height: 1.35;
+  margin-top: 1.8em;
+  margin-bottom: 0.5em;
+  font-weight: 700;
+}
+
+.medium-prose blockquote,
+.article-prose blockquote {
+  border-left: 3px solid #078a4b;
+  padding-left: 20px;
+  margin: 2em 0;
+  font-style: italic;
+  font-size: 1.1em;
+  line-height: 1.6;
+  color: #4b4b4b;
+  background-color: #f4fbf7;
+  padding: 16px 20px;
+  border-radius: 0 8px 8px 0;
+}
+
+.medium-prose a,
+.article-prose a {
+  color: #078a4b;
+  text-decoration: underline;
+  text-decoration-color: #b5e4cc;
+  text-underline-offset: 3px;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.medium-prose a:hover,
+.article-prose a:hover {
+  text-decoration-color: #078a4b;
+  color: #066a3d;
+}
+
+.medium-prose strong {
+  font-weight: 700;
+  color: #111111;
+}
+
+.medium-prose ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 1.6em;
+}
+
+.medium-prose ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 1.6em;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.medium-prose figure {
+  margin: 2.4em 0;
+  display: block;
+  clear: both;
+}
+
+.medium-prose figcaption {
+  text-align: center;
+  font-size: 13px;
+  line-height: 18px;
+  color: #6b6b6b;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+.medium-prose img {
+  border-radius: 6px;
+  margin: 1.5em auto;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Image positioning modifiers */
+.medium-prose img.align-left,
+.medium-prose .float-left {
+  float: left;
+  margin: 0.5em 1.5em 1em 0;
+  max-width: 48%;
+}
+
+.medium-prose img.align-right,
+.medium-prose .float-right {
+  float: right;
+  margin: 0.5em 0 1em 1.5em;
+  max-width: 48%;
+}
+
+.medium-prose img.align-center,
+.medium-prose .align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.medium-prose .img-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 2em 0;
+}
+
+.medium-prose pre {
+  background-color: #f8f9fa;
+  border: 1px solid #ebebeb;
+  border-radius: 6px;
+  padding: 16px 20px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 14px;
+  line-height: 22px;
+  overflow-x: auto;
+  margin: 2em 0;
+  color: #242424;
+}
+
+.medium-prose code:not(pre code) {
+  background-color: #f2f2f2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: var(--font-geist-mono), monospace;
+  color: #242424;
+}
+
+.medium-prose table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: collapse;
+  margin: 2em 0;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 14px;
+}
+
+.medium-prose th,
+.medium-prose td {
+  border: 1px solid #ebebeb;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.medium-prose th {
+  background-color: #fafafa;
+  font-weight: 600;
+}
+
+/* Utility to hide scrollbars on horizontal scroll containers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Medium 3-dot divider */
+.medium-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 40px 0;
+  color: #6b6b6b;
+  letter-spacing: 0.5em;
+  font-size: 20px;
+}
+
+/* Pro Tip Callout Box (Section 20 design.md) */
+.pro-tip {
+  background-color: #f4fbf7;
+  border: 1px solid #e8ece9;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin: 2.2em 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.pro-tip-icon {
+  width: 22px;
+  height: 22px;
+  color: #078a4b;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pro-tip-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #078a4b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.pro-tip-content {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #242424;
+}
+
+/* Tool Review Card (Section 19 design.md) */
+.tool-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  background-color: #ffffff;
+  border: 1px solid #e8ece9;
+  border-radius: 14px;
+  padding: 20px;
+  margin: 2.2em 0;
+}
+
+@media (min-width: 640px) {
+  .tool-card {
+    grid-template-columns: 44% 56%;
+    align-items: center;
+    gap: 24px;
+    padding: 22px;
+  }
+}
+
+.tool-card-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-cover: cover;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #f0f0f0;
+}
+
+/* Minimalist scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #fafafa;
 }
 ::-webkit-scrollbar-thumb {
-  background: #27354f;
+  background: #d4d4d4;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+  background: #a3a3a3;
 }
 
-/* Glassmorphism helpers */
-.glass {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-card {
-  background: rgba(30, 41, 59, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}

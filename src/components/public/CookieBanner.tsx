@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { Cookie } from "lucide-react";
 
 export default function CookieBanner() {
   const [show, setShow] = useState(false);
@@ -27,14 +27,14 @@ export default function CookieBanner() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 left-4 md:left-auto md:max-w-md z-50 p-4 rounded-2xl bg-slate-900/95 border border-slate-700/80 backdrop-blur-xl shadow-2xl text-xs text-slate-300 space-y-3 animate-fade-in">
-      <div className="flex items-start gap-2.5">
-        <ShieldCheck className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+    <div className="fixed bottom-4 right-4 left-4 md:left-auto md:max-w-md z-50 p-4 sm:p-5 rounded-xl bg-white border border-[#ebebeb] shadow-xl text-xs text-[#242424] space-y-3">
+      <div className="flex items-start gap-3">
+        <Cookie className="w-5 h-5 text-[#1a8917] shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="font-semibold text-white">We value your privacy (GDPR &amp; CCPA)</p>
-          <p className="text-slate-400 leading-relaxed text-[11px]">
-            StackYup uses cookies to deliver optimized content and analyze performance. By clicking &quot;Accept&quot;, you agree to our data practices. Learn more in our{" "}
-            <Link href="/page/privacy-policy" className="text-indigo-400 underline hover:text-indigo-300">
+          <p className="font-semibold text-[#242424] text-sm">We value your reading privacy</p>
+          <p className="text-[#6b6b6b] leading-relaxed text-xs">
+            StackYup uses cookies to analyze reading traffic and improve your experience. Read our{" "}
+            <Link href="/page/privacy-policy" className="text-[#1a8917] underline hover:text-[#156d12]">
               Privacy Policy
             </Link>.
           </p>
@@ -45,18 +45,19 @@ export default function CookieBanner() {
         <button
           type="button"
           onClick={handleDecline}
-          className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition text-[11px] font-medium cursor-pointer"
+          className="px-3.5 py-1.5 rounded-full border border-[#ebebeb] text-[#6b6b6b] hover:text-[#242424] hover:bg-[#fafafa] transition text-xs font-medium cursor-pointer"
         >
           Decline
         </button>
         <button
           type="button"
           onClick={handleAccept}
-          className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition text-[11px] font-semibold shadow-md shadow-indigo-600/30 cursor-pointer"
+          className="px-4 py-1.5 rounded-full bg-[#1a8917] hover:bg-[#156d12] text-white transition text-xs font-medium cursor-pointer shadow-xs"
         >
-          Accept All
+          Accept
         </button>
       </div>
     </div>
   );
 }
+

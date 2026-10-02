@@ -20,7 +20,12 @@ const PageCreateSchema = z.object({
 export async function POST(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   let body: unknown;
@@ -74,7 +79,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   try {

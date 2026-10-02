@@ -3,13 +3,19 @@ import { desc, count } from "drizzle-orm";
 import { verifyApiKey } from "@/lib/auth";
 import { errorResponse, successResponse } from "@/lib/response";
 import { uploadFile } from "@/lib/storage";
+import { formatMediaResponse } from "@/lib/formatters";
 import { db, schema } from "@/db";
 
 // POST /api/v1/media - Upload image
 export async function POST(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   try {
@@ -83,7 +89,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   try {
@@ -102,7 +113,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     return successResponse({
-      items,
+      items: items.map(formatMediaResponse),
       pagination: {
         limit,
         offset,

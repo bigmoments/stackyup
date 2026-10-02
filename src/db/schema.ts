@@ -23,6 +23,8 @@ export const posts = pgTable("posts", {
   featuredImageAlt: varchar("featured_image_alt", { length: 255 }),
   tags: jsonb("tags").$type<string[]>().default([]).notNull(),
   faqJson: jsonb("faq_json").$type<{ question: string; answer: string }[]>().default([]),
+  claps: integer("claps").default(0).notNull(),
+  authorName: varchar("author_name", { length: 100 }), // Nullable; null indicates fallback to Site Settings
   status: varchar("status", { length: 20 }).default("draft").notNull(), // 'draft' | 'scheduled' | 'published'
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -80,3 +82,73 @@ export const idempotencyKeys = pgTable("idempotency_keys", {
   responseBody: text("response_body").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// 8. Comments table
+export const comments = pgTable("comments", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  postId: varchar("post_id", { length: 64 }).notNull(),
+  postTitle: varchar("post_title", { length: 255 }),
+  authorName: varchar("author_name", { length: 100 }).notNull(),
+  authorEmail: varchar("author_email", { length: 255 }),
+  content: text("content").notNull(),
+  status: varchar("status", { length: 20 }).default("approved").notNull(), // 'pending' | 'approved' | 'spam' | 'trash'
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 9. Categories table
+export const categories = pgTable("categories", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  description: varchar("description", { length: 255 }),
+  articleCount: integer("article_count").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 10. Tags table
+export const tags = pgTable("tags", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  articleCount: integer("article_count").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 11. Subscribers table
+export const subscribers = pgTable("subscribers", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).default("active").notNull(), // 'active' | 'unsubscribed'
+  source: varchar("source", { length: 50 }).default("website").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 12. Redirects table
+export const redirects = pgTable("redirects", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  fromPath: varchar("from_path", { length: 255 }).notNull().unique(),
+  toPath: varchar("to_path", { length: 255 }).notNull(),
+  statusCode: integer("status_code").default(301).notNull(), // 301 or 302
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 13. Ad Placements table
+export const adPlacements = pgTable("ad_placements", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  slotKey: varchar("slot_key", { length: 100 }).notNull().unique(), // e.g. "article_sidebar", "in_article", "bottom_article"
+  title: varchar("title", { length: 100 }).notNull(),
+  isEnabled: boolean("is_enabled").default(false).notNull(),
+  provider: varchar("provider", { length: 50 }).default("adsense").notNull(),
+  adClient: varchar("ad_client", { length: 100 }),
+  adSlot: varchar("ad_slot", { length: 100 }),
+  customHtml: text("custom_html"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 14. Site Settings table
+export const siteSettings = pgTable("site_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+

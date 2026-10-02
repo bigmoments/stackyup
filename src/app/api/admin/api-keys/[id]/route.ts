@@ -8,6 +8,48 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+// PATCH /api/admin/api-keys/:id - Toggle active/inactive
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  const session = await getCurrentAdmin();
+  if (!session) {
+    return errorResponse("UNAUTHORIZED", "Admin session required", null, 401);
+  }
+
+  const { id } = await context.params;
+
+  try {
+    const body = await request.json().catch(() => ({}));
+    const isActive = body.is_active !== undefined ? Boolean(body.is_active) : undefined;
+
+    const existing = await db
+      .select()
+      .from(schema.apiKeys)
+      .where(eq(schema.apiKeys.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return errorResponse("NOT_FOUND", "API key not found", null, 404);
+    }
+
+    const newActiveState = isActive !== undefined ? isActive : !existing[0].isActive;
+
+    await db
+      .update(schema.apiKeys)
+      .set({ isActive: newActiveState })
+      .where(eq(schema.apiKeys.id, id));
+
+    return successResponse({
+      message: `API key ${newActiveState ? "activated" : "deactivated"} successfully`,
+      id,
+      isActive: newActiveState,
+    });
+  } catch (error) {
+    console.error("Error updating API key:", error);
+    return errorResponse("INTERNAL_SERVER_ERROR", "Failed to update API key", null, 500);
+  }
+}
+
+// DELETE /api/admin/api-keys/:id - Delete / Revoke key
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const session = await getCurrentAdmin();
   if (!session) {
@@ -18,43 +60,23 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   try {
     const existing = await db
-      .select({ id: schema.apiKeys.id })
+      .select()
       .from(schema.apiKeys)
       .where(eq(schema.apiKeys.id, id))
       .limit(1);
 
     if (existing.length === 0) {
-      return errorResponse("NOT_FOUND", "API Key not found", null, 404);
+      return errorResponse("NOT_FOUND", "API key not found", null, 404);
     }
 
     await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
 
-    return successResponse({ message: "API key revoked and deleted successfully" });
+    return successResponse({
+      message: "API key deleted successfully",
+      id,
+    });
   } catch (error) {
-    console.error("Error revoking API key:", error);
-    return errorResponse("INTERNAL_SERVER_ERROR", "Failed to revoke API key", null, 500);
-  }
-}
-
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = await getCurrentAdmin();
-  if (!session) {
-    return errorResponse("UNAUTHORIZED", "Admin session required", null, 401);
-  }
-
-  const { id } = await context.params;
-  const body = await request.json().catch(() => ({}));
-
-  try {
-    const updateValues: Record<string, unknown> = {};
-    if (typeof body.isActive === "boolean") updateValues.isActive = body.isActive;
-    if (body.name) updateValues.name = body.name;
-
-    await db.update(schema.apiKeys).set(updateValues).where(eq(schema.apiKeys.id, id));
-
-    return successResponse({ message: "API key updated successfully" });
-  } catch (error) {
-    console.error("Error updating API key:", error);
-    return errorResponse("INTERNAL_SERVER_ERROR", "Failed to update API key", null, 500);
+    console.error("Error deleting API key:", error);
+    return errorResponse("INTERNAL_SERVER_ERROR", "Failed to delete API key", null, 500);
   }
 }

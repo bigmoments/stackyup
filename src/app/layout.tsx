@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import CookieBanner from "@/components/public/CookieBanner";
 import "./globals.css";
 
@@ -11,6 +12,12 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -46,12 +53,25 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#070b14] text-slate-100">
+      <body className="min-h-full flex flex-col bg-white text-[#101313] selection:bg-[#078a4b]/15 selection:text-[#101313]">
+        {/* Modern glowing top progress bar during route transitions */}
+        <NextTopLoader
+          color="#078a4b"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #078a4b, 0 0 5px #078a4b"
+        />
         {children}
         <CookieBanner />
       </body>
     </html>
   );
 }
+

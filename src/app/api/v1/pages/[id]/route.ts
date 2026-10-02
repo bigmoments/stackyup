@@ -23,7 +23,12 @@ interface RouteContext {
 export async function GET(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   const { id } = await context.params;
@@ -45,7 +50,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const publicUrl = `${protocol}://${host}/page/${records[0].slug}`;
 
     return successResponse({
-      ...records[0],
+      id: records[0].id,
+      title: records[0].title,
+      slug: records[0].slug,
+      content_html: records[0].contentHtml,
+      meta_description: records[0].metaDescription,
+      status: records[0].status,
+      created_at: records[0].createdAt,
+      updated_at: records[0].updatedAt,
       url: publicUrl,
     });
   } catch (error) {
@@ -58,7 +70,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const auth = await verifyApiKey(request);
   if (!auth.authenticated) {
-    return errorResponse("UNAUTHORIZED", auth.error || "Unauthorized", null, 401);
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
   }
 
   const { id } = await context.params;
@@ -115,7 +132,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const publicUrl = `${protocol}://${host}/page/${updated[0].slug}`;
 
     return successResponse({
-      ...updated[0],
+      id: updated[0].id,
+      title: updated[0].title,
+      slug: updated[0].slug,
+      content_html: updated[0].contentHtml,
+      meta_description: updated[0].metaDescription,
+      status: updated[0].status,
+      created_at: updated[0].createdAt,
+      updated_at: updated[0].updatedAt,
       url: publicUrl,
     });
   } catch (error) {
@@ -123,3 +147,38 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return errorResponse("INTERNAL_SERVER_ERROR", "Failed to update page", null, 500);
   }
 }
+
+// DELETE /api/v1/pages/:id
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const auth = await verifyApiKey(request);
+  if (!auth.authenticated) {
+    return errorResponse(
+      auth.errorCode || "UNAUTHORIZED",
+      auth.error || "Unauthorized",
+      auth.details || null,
+      auth.statusCode || 401
+    );
+  }
+
+  const { id } = await context.params;
+
+  try {
+    const existing = await db
+      .select()
+      .from(schema.pages)
+      .where(or(eq(schema.pages.id, id), eq(schema.pages.slug, id)))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return errorResponse("NOT_FOUND", `Page '${id}' not found`, null, 404);
+    }
+
+    await db.delete(schema.pages).where(eq(schema.pages.id, existing[0].id));
+
+    return successResponse({ message: "Page deleted successfully", id: existing[0].id });
+  } catch (error) {
+    console.error("Error deleting page:", error);
+    return errorResponse("INTERNAL_SERVER_ERROR", "Failed to delete page", null, 500);
+  }
+}
+
